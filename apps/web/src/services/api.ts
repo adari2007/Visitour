@@ -35,6 +35,16 @@ export const itinerariesAPI = {
   delete: (id: string) => apiClient.delete(`/itineraries/${id}`),
 };
 
+export const sharesAPI = {
+  list: (itineraryId: string) => apiClient.get(`/itineraries/${itineraryId}/shares`),
+  create: (itineraryId: string, data: { email: string; access: 'view' | 'edit' }) =>
+    apiClient.post(`/itineraries/${itineraryId}/shares`, data),
+  update: (itineraryId: string, shareId: string, data: { access: 'view' | 'edit' }) =>
+    apiClient.patch(`/itineraries/${itineraryId}/shares/${shareId}`, data),
+  remove: (itineraryId: string, shareId: string) =>
+    apiClient.delete(`/itineraries/${itineraryId}/shares/${shareId}`),
+};
+
 // Entries API
 export const entriesAPI = {
   getByItinerary: (itineraryId: string) =>

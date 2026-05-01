@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { itinerariesAPI, entriesAPI } from '@/services/api';
+import { itinerariesAPI, entriesAPI, sharesAPI } from '@/services/api';
 
 interface Entry {
   id: string;
@@ -24,6 +24,8 @@ interface Itinerary {
   startDate: string;
   endDate: string;
   isPublic: boolean;
+  ownerId?: string;
+  ownerEmail?: string;
   createdAt: string;
   updatedAt: string;
   entries?: Entry[];
@@ -33,6 +35,7 @@ interface ItineraryState {
   items: Itinerary[];
   selected: Itinerary | null;
   entries: Entry[];
+  shares: any[];
   loading: boolean;
   error: string | null;
 }
@@ -41,9 +44,47 @@ const initialState: ItineraryState = {
   items: [],
   selected: null,
   entries: [],
+  shares: [],
   loading: false,
   error: null,
 };
+
+export const fetchShares = createAsyncThunk(
+  'itineraries/fetchShares',
+  async (itineraryId: string) => {
+    const response = await sharesAPI.list(itineraryId);
+    return response.data.shares;
+  }
+);
+
+export const createShare = createAsyncThunk(
+  'itineraries/createShare',
+  async (data: { itineraryId: string; email: string; access: 'view' | 'edit' }) => {
+    const response = await sharesAPI.create(data.itineraryId, {
+      email: data.email,
+      access: data.access,
+    });
+    return response.data.share;
+  }
+);
+
+export const updateShare = createAsyncThunk(
+  'itineraries/updateShare',
+  async (data: { itineraryId: string; shareId: string; access: 'view' | 'edit' }) => {
+    const response = await sharesAPI.update(data.itineraryId, data.shareId, {
+      access: data.access,
+    });
+    return response.data.share;
+  }
+);
+
+export const deleteShare = createAsyncThunk(
+  'itineraries/deleteShare',
+  async (data: { itineraryId: string; shareId: string }) => {
+    await sharesAPI.remove(data.itineraryId, data.shareId);
+    return data.shareId;
+  }
+);
 
 export const fetchItineraries = createAsyncThunk('itineraries/fetchAll', async () => {
   const response = await itinerariesAPI.getAll();
@@ -160,6 +201,26 @@ const itinerarySlice = createSlice({
       })
       .addCase(deleteEntry.fulfilled, (state, action) => {
         state.entries = state.entries.filter((entry) => entry.id !== action.payload);
+      })
+      .addCase(fetchShares.fulfilled, (state, action) => {
+        state.shares = action.payload;
+      })
+      .addCase(createShare.fulfilled, (state, action) => {
+        const index = state.shares.findIndex((s) => s.id === action.payload.id);
+        if (index === -1) {
+          state.shares.push(action.payload);
+        } else {
+          state.shares[index] = action.payload;
+        }
+      })
+      .addCase(updateShare.fulfilled, (state, action) => {
+        const index = state.shares.findIndex((s) => s.id === action.payload.id);
+        if (index !== -1) {
+          state.shares[index] = action.payload;
+        }
+      })
+      .addCase(deleteShare.fulfilled, (state, action) => {
+        state.shares = state.shares.filter((s) => s.id !== action.payload);
       });
   },
 });

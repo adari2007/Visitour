@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { fetchItineraries, createItinerary } from '@/store/itinerarySlice';
-import { formatDate } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 
 export function DashboardPage() {
   const dispatch = useAppDispatch();
@@ -16,6 +16,15 @@ export function DashboardPage() {
     startDate: '',
     endDate: '',
   });
+
+  const ownedItineraries = itineraries.filter(
+    (itinerary) =>
+      !itinerary.ownerId || itinerary.ownerId === user?.id || itinerary.ownerEmail === user?.email
+  );
+  const sharedItineraries = itineraries.filter(
+    (itinerary) =>
+      itinerary.ownerId && itinerary.ownerId !== user?.id && itinerary.ownerEmail !== user?.email
+  );
 
   useEffect(() => {
     if (!token) {
@@ -117,26 +126,58 @@ export function DashboardPage() {
 
       {loading ? (
         <div className="text-center py-12">Loading itineraries...</div>
-      ) : itineraries.length === 0 ? (
-        <div className="bg-white p-12 rounded-lg shadow text-center">
-          <p className="text-gray-500 text-lg mb-4">No itineraries yet. Create your first one!</p>
-        </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {itineraries.map((itinerary) => (
-            <Link
-              key={itinerary.id}
-              to={`/itinerary/${itinerary.id}`}
-              className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition cursor-pointer"
-            >
-              <h3 className="text-xl font-bold text-gray-900 mb-2">{itinerary.title}</h3>
-              {itinerary.description && <p className="text-gray-600 mb-3 line-clamp-2">{itinerary.description}</p>}
-              <div className="text-sm text-gray-500 space-y-1">
-                <p>📅 {formatDate(new Date(itinerary.startDate), 'MMM dd, yyyy')}</p>
-                <p>📍 to {formatDate(new Date(itinerary.endDate), 'MMM dd, yyyy')}</p>
+        <div className="space-y-10">
+          <section>
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">My Itineraries</h2>
+            {ownedItineraries.length === 0 ? (
+              <div className="bg-white p-8 rounded-lg shadow text-center">
+                <p className="text-gray-500 text-lg">No itineraries yet. Create your first one!</p>
               </div>
-            </Link>
-          ))}
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {ownedItineraries.map((itinerary) => (
+                  <Link
+                    key={itinerary.id}
+                    to={`/itinerary/${itinerary.id}`}
+                    className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition cursor-pointer"
+                  >
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">{itinerary.title}</h3>
+                    {itinerary.description && <p className="text-gray-600 mb-3 line-clamp-2">{itinerary.description}</p>}
+                    <div className="text-sm text-gray-500 space-y-1">
+                      <p>📅 {format(parseISO(itinerary.startDate), 'MMM dd, yyyy')}</p>
+                      <p>📍 to {format(parseISO(itinerary.endDate), 'MMM dd, yyyy')}</p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {sharedItineraries.length > 0 ? (
+            <section>
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">Shared with me</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {sharedItineraries.map((itinerary) => (
+                  <Link
+                    key={itinerary.id}
+                    to={`/itinerary/${itinerary.id}`}
+                    className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition cursor-pointer border border-violet-100"
+                  >
+                    <p className="inline-block text-xs font-semibold px-2 py-1 rounded-full bg-violet-100 text-violet-700 mb-2">
+                      Shared
+                    </p>
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">{itinerary.title}</h3>
+                    {itinerary.description && <p className="text-gray-600 mb-3 line-clamp-2">{itinerary.description}</p>}
+                    <div className="text-sm text-gray-500 space-y-1">
+                      <p>📅 {format(parseISO(itinerary.startDate), 'MMM dd, yyyy')}</p>
+                      <p>📍 to {format(parseISO(itinerary.endDate), 'MMM dd, yyyy')}</p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          ) : null}
         </div>
       )}
     </div>
