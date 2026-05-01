@@ -4,8 +4,23 @@
   "description": "Cross-platform itinerary application",
   "private": true,
   "scripts": {
-    "dev:api": "cd apps/api && npm run dev",
-    "dev:web": "cd apps/web && npm run dev",
-    "build": "echo 'Build all apps'"
-  }
+    "dev": "yarn workspaces foreach -p --interlaced run dev",
+    "dev:web": "yarn workspace @visitour/web dev",
+    "dev:mobile": "yarn workspace @visitour/mobile start",
+    "dev:api": "yarn workspace @visitour/api dev",
+    "build": "yarn workspaces foreach run build",
+    "build:web": "yarn workspace @visitour/web build",
+    "build:mobile": "yarn workspace @visitour/mobile build",
+    "build:api": "yarn workspace @visitour/api build",
+    "lint": "yarn workspaces foreach run lint",
+    "type-check": "yarn workspaces foreach run type-check",
+    "test": "yarn workspaces foreach run test",
+    "format": "prettier --write \"apps/**/*.{ts,tsx,js,jsx,json,css}\" \"packages/**/*.{ts,tsx,js,jsx,json,css}\""
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.0.0"
+  },
+  "packageManager": "yarn@4.14.1"
 }

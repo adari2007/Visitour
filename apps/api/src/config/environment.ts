@@ -6,7 +6,11 @@ export const environment = {
   port: parseInt(process.env.PORT || '3000', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
   database: {
-    url: process.env.DATABASE_URL || 'postgresql://visitour:password@localhost:5432/visitour',
+    host: process.env.DATABASE_HOST || 'localhost',
+    port: parseInt(process.env.DATABASE_PORT || '5432', 10),
+    user: process.env.DATABASE_USER || 'visitour',
+    password: process.env.DATABASE_PASSWORD || 'password',
+    database: process.env.DATABASE_NAME || 'visitour',
   },
   jwt: {
     secret: process.env.JWT_SECRET || 'your-super-secret-jwt-key',
@@ -21,4 +25,3 @@ export const environment = {
   isDevelopment: process.env.NODE_ENV !== 'production',
   isProduction: process.env.NODE_ENV === 'production',
 };
-

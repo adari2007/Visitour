@@ -4,7 +4,11 @@ import { environment } from './environment.js';
 const { Pool } = pg;
 
 export const pool = new Pool({
-  connectionString: environment.database.url,
+  host: environment.database.host,
+  port: environment.database.port,
+  user: environment.database.user,
+  password: environment.database.password,
+  database: environment.database.database,
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
@@ -30,4 +34,3 @@ export async function closeDatabase() {
   await pool.end();
   console.log('✓ Database connection closed');
 }
-
