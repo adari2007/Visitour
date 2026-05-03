@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { register } from '@/store/authSlice';
 
@@ -30,9 +30,9 @@ export function RegisterPage() {
   };
 
   return (
-    <div className="container mx-auto px-6 py-12">
-      <div className="max-w-md mx-auto bg-white p-8 rounded-lg shadow">
-        <h1 className="text-3xl font-bold text-gray-900 mb-6">Create Account</h1>
+    <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      <div className="max-w-md mx-auto bg-white p-5 sm:p-8 rounded-lg shadow">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6">Create Account</h1>
 
         {error && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">{error}</div>}
 
@@ -95,9 +95,9 @@ export function RegisterPage() {
 
         <p className="text-center text-gray-600 mt-4">
           Already have an account?{' '}
-          <a href="/login" className="text-blue-600 hover:underline">
+          <Link to="/login" className="text-blue-600 hover:underline">
             Login
-          </a>
+          </Link>
         </p>
       </div>
     </div>

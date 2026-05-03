@@ -2,10 +2,10 @@ import express from 'express';
 import cors from 'cors';
 import http from 'http';
 import { Server } from 'socket.io';
-import dotenv from 'dotenv';
 import { Pool } from 'pg';
+import { loadEnvironment } from './config/env-loader.js';
 
-dotenv.config();
+loadEnvironment();
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -27,8 +27,25 @@ app.use(
 app.use(express.json());
 
 const dbUrl = process.env.DATABASE_URL;
-if (!dbUrl) {
-  throw new Error('DATABASE_URL is required. Please set it in apps/api/.env');
+const dbHost = process.env.DATABASE_HOST;
+const dbPort = Number(process.env.DATABASE_PORT || 5432);
+const dbUser = process.env.DATABASE_USER;
+const dbPassword = process.env.DATABASE_PASSWORD;
+const dbName = process.env.DATABASE_NAME;
+
+const parseBoolEnv = (value) => {
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+  return undefined;
+};
+
+const hasDiscreteDbConfig = Boolean(dbHost && dbUser && dbPassword && dbName);
+if (!dbUrl && !hasDiscreteDbConfig) {
+  throw new Error(
+    'Database configuration is required. Set DATABASE_URL or DATABASE_HOST/DATABASE_PORT/DATABASE_USER/DATABASE_PASSWORD/DATABASE_NAME in apps/api/.env'
+  );
 }
 
 const DB_SCHEMA = process.env.DB_SCHEMA || 'visitour_dev';
@@ -43,83 +60,44 @@ const T = {
   shares: `${SCHEMA_IDENT}.itinerary_shares`,
 };
 
-const pool = new Pool({
-  connectionString: dbUrl,
-  ssl: dbUrl.includes('supabase.co') ? { rejectUnauthorized: false } : undefined,
-});
+const dbSsl = parseBoolEnv(process.env.DB_SSL);
+const dbSslRejectUnauthorized = parseBoolEnv(process.env.DB_SSL_REJECT_UNAUTHORIZED);
+const isLocalDbHost = dbHost ? ['localhost', '127.0.0.1'].includes(dbHost) : false;
+const isLocalDbUrl = dbUrl ? /@(localhost|127\.0\.0\.1)(:|\/|$)/.test(dbUrl) : false;
+const sslEnabled = dbSsl ?? Boolean((dbUrl && !isLocalDbUrl) || (!dbUrl && dbHost && !isLocalDbHost));
+const sslConfig = sslEnabled
+  ? { rejectUnauthorized: dbSslRejectUnauthorized ?? false }
+  : undefined;
+
+const pool = new Pool(
+  dbUrl
+    ? {
+        connectionString: dbUrl,
+        ssl: sslConfig,
+      }
+    : {
+        host: dbHost,
+        port: dbPort,
+        user: dbUser,
+        password: dbPassword,
+        database: dbName,
+        ssl: sslConfig,
+      }
+);
 
 const makeId = (prefix = '') => `${prefix}${Math.random().toString(36).slice(2, 11)}`;
 const normalizeEmail = (email) => String(email || '').trim().toLowerCase();
 
-const ensureSchema = async () => {
-  await pool.query(`CREATE SCHEMA IF NOT EXISTS ${SCHEMA_IDENT};`);
-
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS ${T.users} (
-      id TEXT PRIMARY KEY,
-      email TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL,
-      first_name TEXT,
-      last_name TEXT,
-      created_at TIMESTAMPTZ NOT NULL,
-      updated_at TIMESTAMPTZ NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS ${T.itineraries} (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL,
-      owner_id TEXT NOT NULL,
-      owner_email TEXT NOT NULL,
-      description TEXT,
-      start_date TEXT NOT NULL,
-      end_date TEXT NOT NULL,
-      is_public BOOLEAN NOT NULL DEFAULT FALSE,
-      created_at TIMESTAMPTZ NOT NULL,
-      updated_at TIMESTAMPTZ NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS ${T.entries} (
-      id TEXT PRIMARY KEY,
-      itinerary_id TEXT NOT NULL,
-      day_number INTEGER,
-      date TEXT NOT NULL,
-      title TEXT NOT NULL,
-      description TEXT,
-      location TEXT,
-      time_start TEXT,
-      time_end TEXT,
-      category TEXT NOT NULL,
-      custom_details JSONB NOT NULL DEFAULT '{}'::jsonb,
-      order_index INTEGER NOT NULL DEFAULT 0,
-      created_at TIMESTAMPTZ NOT NULL,
-      updated_at TIMESTAMPTZ NOT NULL,
-      CONSTRAINT fk_entries_itinerary
-        FOREIGN KEY(itinerary_id)
-        REFERENCES ${T.itineraries}(id)
-        ON DELETE CASCADE
-    );
-
-    CREATE TABLE IF NOT EXISTS ${T.shares} (
-      id TEXT PRIMARY KEY,
-      itinerary_id TEXT NOT NULL,
-      email TEXT NOT NULL,
-      access TEXT NOT NULL,
-      token TEXT UNIQUE NOT NULL,
-      share_url TEXT NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL,
-      updated_at TIMESTAMPTZ NOT NULL,
-      CONSTRAINT fk_shares_itinerary
-        FOREIGN KEY(itinerary_id)
-        REFERENCES ${T.itineraries}(id)
-        ON DELETE CASCADE
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_itineraries_owner_id ON ${T.itineraries}(owner_id);
-    CREATE INDEX IF NOT EXISTS idx_entries_itinerary_id ON ${T.entries}(itinerary_id);
-    CREATE INDEX IF NOT EXISTS idx_entries_date ON ${T.entries}(date);
-    CREATE INDEX IF NOT EXISTS idx_shares_itinerary_id ON ${T.shares}(itinerary_id);
-    CREATE INDEX IF NOT EXISTS idx_shares_email ON ${T.shares}(email);
-  `);
+const verifyDatabaseObjects = async () => {
+  const required = [T.users, T.itineraries, T.entries, T.shares];
+  for (const fqTable of required) {
+    const { rows } = await pool.query('SELECT to_regclass($1) AS regclass', [fqTable]);
+    if (!rows[0]?.regclass) {
+      throw new Error(
+        `Missing required table ${fqTable}. Run database migrations/setup first. Runtime DDL is disabled.`
+      );
+    }
+  }
 };
 
 const getUserById = async (id) => {
@@ -272,6 +250,27 @@ app.get('/api/itineraries', async (req, res) => {
   );
   const visible = rows.map(mapItinerary);
   res.json({ itineraries: visible });
+});
+
+// Get all public itineraries (accessible to authenticated users)
+app.get('/api/itineraries/public/all', async (req, res) => {
+  const user = await getRequestUser(req);
+  if (!user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT * FROM ${T.itineraries}
+       WHERE is_public = true
+       ORDER BY created_at DESC`
+    );
+
+    const itineraries = rows.map(mapItinerary);
+    res.json({ itineraries });
+  } catch (error) {
+    res.status(500).json({ error: error.message || 'Failed to fetch public itineraries' });
+  }
 });
 
 app.post('/api/itineraries', async (req, res) => {
@@ -764,7 +763,7 @@ io.on('connection', (socket) => {
 
 const PORT = Number(process.env.PORT || 3000);
 
-ensureSchema()
+verifyDatabaseObjects()
   .then(() => {
     httpServer.listen(PORT, () => {
       console.log(`✓ Server running on http://localhost:${PORT}`);
@@ -775,7 +774,7 @@ ensureSchema()
     });
   })
   .catch((error) => {
-    console.error('Failed to initialize database schema:', error);
+    console.error('Failed to verify database objects:', error);
     process.exit(1);
   });
 

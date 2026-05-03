@@ -8,21 +8,21 @@ export function HomePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* Hero Section */}
-      <div className="container mx-auto px-6 py-20">
+      <div className="container mx-auto px-4 sm:px-6 py-12 sm:py-20">
         <div className="max-w-3xl mx-auto text-center">
-          <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
+          <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold text-gray-900 mb-6">
             Plan Your Journey with <span className="text-blue-600">Visitour</span>
           </h1>
-          <p className="text-xl text-gray-600 mb-8">
+          <p className="text-base sm:text-xl text-gray-600 mb-8">
             Create detailed itineraries for your travels. Organize your days, add activities, and
             sync across all your devices.
           </p>
 
-          <div className="flex gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
             {token ? (
               <Link
                 to="/dashboard"
-                className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold text-lg"
+                className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold text-base sm:text-lg"
               >
                 Go to Dashboard
               </Link>
@@ -30,13 +30,13 @@ export function HomePage() {
               <>
                 <Link
                   to="/register"
-                  className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold text-lg"
+                  className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold text-base sm:text-lg"
                 >
                   Get Started Free
                 </Link>
                 <Link
                   to="/login"
-                  className="px-8 py-3 border-2 border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 font-semibold text-lg"
+                  className="px-8 py-3 border-2 border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 font-semibold text-base sm:text-lg"
                 >
                   Login
                 </Link>
@@ -47,11 +47,11 @@ export function HomePage() {
       </div>
 
       {/* Features Section */}
-      <div className="container mx-auto px-6 py-20">
-        <h2 className="text-4xl font-bold text-gray-900 mb-12 text-center">Features</h2>
+      <div className="container mx-auto px-4 sm:px-6 py-12 sm:py-20">
+        <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-8 sm:mb-12 text-center">Features</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="bg-white p-8 rounded-lg shadow hover:shadow-lg transition">
+          <div className="bg-white p-6 sm:p-8 rounded-lg shadow hover:shadow-lg transition">
             <div className="text-4xl mb-4">📅</div>
             <h3 className="text-xl font-bold text-gray-900 mb-2">Organize by Day</h3>
             <p className="text-gray-600">
@@ -59,7 +59,7 @@ export function HomePage() {
             </p>
           </div>
 
-          <div className="bg-white p-8 rounded-lg shadow hover:shadow-lg transition">
+          <div className="bg-white p-6 sm:p-8 rounded-lg shadow hover:shadow-lg transition">
             <div className="text-4xl mb-4">📍</div>
             <h3 className="text-xl font-bold text-gray-900 mb-2">Add Locations</h3>
             <p className="text-gray-600">
@@ -67,7 +67,7 @@ export function HomePage() {
             </p>
           </div>
 
-          <div className="bg-white p-8 rounded-lg shadow hover:shadow-lg transition">
+          <div className="bg-white p-6 sm:p-8 rounded-lg shadow hover:shadow-lg transition">
             <div className="text-4xl mb-4">🔄</div>
             <h3 className="text-xl font-bold text-gray-900 mb-2">Sync Everywhere</h3>
             <p className="text-gray-600">
@@ -75,7 +75,7 @@ export function HomePage() {
             </p>
           </div>
 
-          <div className="bg-white p-8 rounded-lg shadow hover:shadow-lg transition">
+          <div className="bg-white p-6 sm:p-8 rounded-lg shadow hover:shadow-lg transition">
             <div className="text-4xl mb-4">🎯</div>
             <h3 className="text-xl font-bold text-gray-900 mb-2">Categories</h3>
             <p className="text-gray-600">
@@ -83,7 +83,7 @@ export function HomePage() {
             </p>
           </div>
 
-          <div className="bg-white p-8 rounded-lg shadow hover:shadow-lg transition">
+          <div className="bg-white p-6 sm:p-8 rounded-lg shadow hover:shadow-lg transition">
             <div className="text-4xl mb-4">👥</div>
             <h3 className="text-xl font-bold text-gray-900 mb-2">Share Plans</h3>
             <p className="text-gray-600">
@@ -91,7 +91,7 @@ export function HomePage() {
             </p>
           </div>
 
-          <div className="bg-white p-8 rounded-lg shadow hover:shadow-lg transition">
+          <div className="bg-white p-6 sm:p-8 rounded-lg shadow hover:shadow-lg transition">
             <div className="text-4xl mb-4">📱</div>
             <h3 className="text-xl font-bold text-gray-900 mb-2">Mobile Ready</h3>
             <p className="text-gray-600">

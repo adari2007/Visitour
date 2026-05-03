@@ -1,12 +1,62 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../config/database.js';
 import { authMiddleware } from '../middleware/index.js';
-import { CreateItinerarySchema, UpdateItinerarySchema } from '../utils/validators.js';
+import { CreateItinerarySchema, UpdateItinerarySchema, UpdateItineraryPublicSchema } from '../utils/validators.js';
 import { v4 as uuidv4 } from 'uuid';
 
 const router = Router();
 
 router.use(authMiddleware);
+
+// Get all public itineraries (accessible to authenticated users)
+router.get('/public/all', async (req: Request, res: Response) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, title, description, start_date, end_date, is_public, user_id, created_at, updated_at
+       FROM itineraries
+       WHERE is_public = true
+       ORDER BY created_at DESC`,
+    );
+
+    console.log('Public itineraries query result:', result.rows.length, 'rows found');
+    console.log('Raw data:', result.rows);
+
+    // Get user email for each itinerary
+    const itinerariesWithOwner = await Promise.all(
+      result.rows.map(async (row) => {
+        let ownerEmail = '';
+        try {
+          const userResult = await pool.query(
+            'SELECT email FROM users WHERE id = $1',
+            [row.user_id]
+          );
+          ownerEmail = userResult.rows[0]?.email || '';
+        } catch (err) {
+          console.error('Failed to fetch owner email:', err);
+        }
+
+        return {
+          id: row.id,
+          title: row.title,
+          description: row.description,
+          startDate: row.start_date,
+          endDate: row.end_date,
+          isPublic: row.is_public,
+          ownerEmail,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+        };
+      })
+    );
+
+    res.json({
+      itineraries: itinerariesWithOwner,
+    });
+    console.log('Returning public itineraries:', itinerariesWithOwner.length);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Failed to fetch public itineraries' });
+  }
+});
 
 // Get all itineraries for the current user
 router.get('/', async (req: Request, res: Response) => {
@@ -72,9 +122,9 @@ router.post('/', async (req: Request, res: Response) => {
 router.get('/:id', async (req: Request, res: Response) => {
   try {
     const result = await pool.query(
-      `SELECT id, title, description, start_date, end_date, is_public, created_at, updated_at
+      `SELECT id, title, description, start_date, end_date, is_public, user_id, created_at, updated_at
        FROM itineraries
-       WHERE id = $1 AND user_id = $2`,
+       WHERE id = $1 AND (user_id = $2 OR is_public = true)`,
       [req.params.id, req.userId]
     );
 
@@ -91,6 +141,7 @@ router.get('/:id', async (req: Request, res: Response) => {
         startDate: row.start_date,
         endDate: row.end_date,
         isPublic: row.is_public,
+        ownerId: row.user_id,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
       },
@@ -103,7 +154,20 @@ router.get('/:id', async (req: Request, res: Response) => {
 // Update an itinerary
 router.put('/:id', async (req: Request, res: Response) => {
   try {
-    const data = UpdateItinerarySchema.parse(req.body);
+    // Check if only isPublic is being updated
+    const isOnlyPublicUpdate = Object.keys(req.body).length === 1 && req.body.isPublic !== undefined;
+
+    console.log('PUT /itineraries/:id called');
+    console.log('Itinerary ID:', req.params.id);
+    console.log('Request body:', req.body);
+    console.log('Is only public update:', isOnlyPublicUpdate);
+
+    let data;
+    if (isOnlyPublicUpdate) {
+      data = UpdateItineraryPublicSchema.parse(req.body);
+    } else {
+      data = UpdateItinerarySchema.parse(req.body);
+    }
 
     // Check ownership
     const check = await pool.query('SELECT id FROM itineraries WHERE id = $1 AND user_id = $2', [
@@ -118,6 +182,8 @@ router.put('/:id', async (req: Request, res: Response) => {
     const updates = [];
     const values = [];
     let paramIndex = 1;
+
+    console.log('Building update query...');
 
     if (data.title !== undefined) {
       updates.push(`title = $${paramIndex}`);
@@ -140,6 +206,7 @@ router.put('/:id', async (req: Request, res: Response) => {
       paramIndex++;
     }
     if (data.isPublic !== undefined) {
+      console.log('Setting is_public to:', data.isPublic);
       updates.push(`is_public = $${paramIndex}`);
       values.push(data.isPublic);
       paramIndex++;
@@ -150,7 +217,15 @@ router.put('/:id', async (req: Request, res: Response) => {
 
     const query = `UPDATE itineraries SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING *`;
 
+    console.log('Final query:', query);
+    console.log('Query values:', values);
+
     const result = await pool.query(query, values);
+    console.log('Update result rows:', result.rows.length);
+    if (result.rows.length > 0) {
+      console.log('Updated itinerary is_public:', result.rows[0].is_public);
+    }
+
     const row = result.rows[0];
 
     res.json({

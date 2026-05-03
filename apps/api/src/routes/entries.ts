@@ -11,9 +11,9 @@ router.use(authMiddleware);
 // Get all entries for an itinerary
 router.get('/itinerary/:itineraryId', async (req: Request, res: Response) => {
   try {
-    // Verify ownership
+    // Verify ownership or public access
     const verify = await pool.query(
-      'SELECT id FROM itineraries WHERE id = $1 AND user_id = $2',
+      'SELECT id, is_public FROM itineraries WHERE id = $1 AND (user_id = $2 OR is_public = true)',
       [req.params.itineraryId, req.userId]
     );
 

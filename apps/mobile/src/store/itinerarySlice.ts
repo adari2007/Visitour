@@ -128,39 +128,68 @@ const itinerarySlice = createSlice({
         state.loading = false;
         state.error = action.error.message || 'Failed to fetch itineraries';
       })
-      .addCase(fetchItinerary.fulfilled, (state, action) => {
-        state.selected = action.payload;
-      })
-      .addCase(createItinerary.fulfilled, (state, action) => {
-        state.items.push(action.payload);
-      })
-      .addCase(updateItinerary.fulfilled, (state, action) => {
-        const index = state.items.findIndex((item) => item.id === action.payload.id);
-        if (index !== -1) {
-          state.items[index] = action.payload;
-        }
-        if (state.selected?.id === action.payload.id) {
-          state.selected = action.payload;
-        }
-      })
-      .addCase(deleteItinerary.fulfilled, (state, action) => {
-        state.items = state.items.filter((item) => item.id !== action.payload);
-      })
-      .addCase(fetchEntries.fulfilled, (state, action) => {
-        state.entries = action.payload;
-      })
-      .addCase(createEntry.fulfilled, (state, action) => {
-        state.entries.push(action.payload);
-      })
-      .addCase(updateEntry.fulfilled, (state, action) => {
-        const index = state.entries.findIndex((entry) => entry.id === action.payload.id);
-        if (index !== -1) {
-          state.entries[index] = action.payload;
-        }
-      })
-      .addCase(deleteEntry.fulfilled, (state, action) => {
-        state.entries = state.entries.filter((entry) => entry.id !== action.payload);
-      });
+       .addCase(fetchItinerary.fulfilled, (state, action) => {
+         state.selected = action.payload;
+       })
+       .addCase(fetchItinerary.rejected, (state, action) => {
+         state.error = action.error.message || 'Failed to fetch itinerary';
+       })
+       .addCase(createItinerary.fulfilled, (state, action) => {
+         state.items.push(action.payload);
+       })
+       .addCase(createItinerary.rejected, (state, action) => {
+         state.error = action.error.message || 'Failed to create itinerary';
+       })
+       .addCase(updateItinerary.fulfilled, (state, action) => {
+         const index = state.items.findIndex((item) => item.id === action.payload.id);
+         if (index !== -1) {
+           state.items[index] = action.payload;
+         }
+         if (state.selected?.id === action.payload.id) {
+           state.selected = action.payload;
+         }
+       })
+       .addCase(updateItinerary.rejected, (state, action) => {
+         state.error = action.error.message || 'Failed to update itinerary';
+       })
+       .addCase(deleteItinerary.fulfilled, (state, action) => {
+         state.items = state.items.filter((item) => item.id !== action.payload);
+       })
+       .addCase(deleteItinerary.rejected, (state, action) => {
+         state.error = action.error.message || 'Failed to delete itinerary';
+       })
+       .addCase(fetchEntries.fulfilled, (state, action) => {
+         state.entries = action.payload;
+       })
+       .addCase(fetchEntries.rejected, (state, action) => {
+         state.error = action.error.message || 'Failed to fetch entries';
+       })
+       .addCase(createEntry.fulfilled, (state, action) => {
+         state.entries.push(action.payload);
+       })
+       .addCase(createEntry.rejected, (state, action) => {
+         state.error = action.error.message || 'Failed to create entry';
+       })
+       .addCase(updateEntry.fulfilled, (state, action) => {
+         const index = state.entries.findIndex((entry) => entry.id === action.payload.id);
+         if (index !== -1) {
+           state.entries[index] = action.payload;
+         }
+       })
+       .addCase(updateEntry.rejected, (state, action) => {
+         state.error = action.error.message || 'Failed to update entry';
+       })
+       .addCase(deleteEntry.pending, (state) => {
+         state.loading = true;
+       })
+       .addCase(deleteEntry.fulfilled, (state, action) => {
+         state.loading = false;
+         state.entries = state.entries.filter((entry) => entry.id !== action.payload);
+       })
+       .addCase(deleteEntry.rejected, (state, action) => {
+         state.loading = false;
+         state.error = action.error.message || 'Failed to delete entry';
+       });
   },
 });
 

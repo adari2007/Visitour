@@ -4,7 +4,6 @@ import http from 'http';
 import { Server } from 'socket.io';
 import { environment } from './config/environment.js';
 import { initializeDatabase, closeDatabase } from './config/database.js';
-import { runMigrations } from './config/migrations.js';
 import { errorHandler } from './middleware/index.js';
 import authRoutes from './routes/auth.js';
 import itineraryRoutes from './routes/itineraries.js';
@@ -77,12 +76,16 @@ io.on('connection', (socket) => {
 // Start server
 async function start() {
   try {
+    console.log('Starting server...');
     await initializeDatabase();
-    await runMigrations();
+    console.log('Database initialized');
+
 
     server.listen(environment.port, () => {
       console.log(`✓ Server running on http://localhost:${environment.port}`);
       console.log(`✓ WebSocket available at ws://localhost:${environment.port}`);
+      console.log(`✓ Database: ${environment.nodeEnv} mode`);
+      console.log(`✓ CORS origin: ${environment.cors.origin}`);
     });
   } catch (error) {
     console.error('✗ Failed to start server:', error);

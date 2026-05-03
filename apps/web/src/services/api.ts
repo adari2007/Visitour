@@ -29,9 +29,12 @@ export const authAPI = {
 // Itineraries API
 export const itinerariesAPI = {
   getAll: () => apiClient.get('/itineraries'),
+  getPublic: () => apiClient.get('/itineraries/public/all'),
   getById: (id: string) => apiClient.get(`/itineraries/${id}`),
   create: (data: any) => apiClient.post('/itineraries', data),
   update: (id: string, data: any) => apiClient.put(`/itineraries/${id}`, data),
+  updatePublicStatus: (id: string, isPublic: boolean) =>
+    apiClient.put(`/itineraries/${id}`, { isPublic }),
   delete: (id: string) => apiClient.delete(`/itineraries/${id}`),
 };
 

@@ -18,9 +18,11 @@ interface EntriesListProps {
   entries: Entry[];
   startDate: string;
   endDate: string;
+  canManageEntries?: boolean;
   onCreateEntries: (entries: any[]) => Promise<void>;
   onUpdateEntry: (id: string, updates: any) => Promise<void>;
   onDelete: (entry: Entry) => void;
+  onDeleteEntryById?: (id: string) => Promise<void>;
   isLoading?: boolean;
 }
 
@@ -48,9 +50,11 @@ export function EntriesList({
   entries,
   startDate,
   endDate,
+  canManageEntries = true,
   onCreateEntries,
   onUpdateEntry,
   onDelete,
+  onDeleteEntryById,
   isLoading = false,
 }: EntriesListProps) {
   const [expandedDays, setExpandedDays] = React.useState<Record<number, boolean>>({});
@@ -66,23 +70,26 @@ export function EntriesList({
     dayNumber: number;
     date: string;
   } | null>(null);
-  const [flightForm, setFlightForm] = React.useState({
-    origin: '',
-    destination: '',
-    pnr: '',
-    outboundFlightNumber: '',
-    outboundDepartureTime: '',
-    outboundArrivalTime: '',
-    outboundDepartureTimezone: '',
-    outboundArrivalTimezone: '',
-    isRoundTrip: false,
-    returnDate: '',
-    returnFlightNumber: '',
-    returnDepartureTime: '',
-    returnArrivalTime: '',
-    returnDepartureTimezone: '',
-    returnArrivalTimezone: '',
-  });
+   const [flightForm, setFlightForm] = React.useState({
+     origin: '',
+     destination: '',
+     pnr: '',
+     transportType: 'flight', // 'flight' | 'bus' | 'train' | 'other'
+     customTransportType: '', // for 'other' option
+     outboundFlightNumber: '',
+     outboundDepartureTime: '',
+     outboundArrivalTime: '',
+     outboundDepartureTimezone: '',
+     outboundArrivalTimezone: '',
+     isRoundTrip: false,
+     showOnAllDays: false, // show on all days for round trip
+     returnDate: '',
+     returnFlightNumber: '',
+     returnDepartureTime: '',
+     returnArrivalTime: '',
+     returnDepartureTimezone: '',
+     returnArrivalTimezone: '',
+   });
   const [hotelForm, setHotelForm] = React.useState({
     hotelName: '',
     checkInDate: '',
@@ -114,18 +121,59 @@ export function EntriesList({
     return eachDayOfInterval({ start, end });
   }, [startDate, endDate]);
 
-  const entriesByDate = React.useMemo(() => {
-    return entries.reduce(
-      (acc, entry) => {
-        if (!acc[entry.date]) {
-          acc[entry.date] = [];
-        }
-        acc[entry.date].push(entry);
-        return acc;
-      },
-      {} as Record<string, Entry[]>
-    );
-  }, [entries]);
+   const sortedEntriesByDate = React.useMemo(() => {
+     return entries.reduce(
+       (acc, entry) => {
+         if (!acc[entry.date]) {
+           acc[entry.date] = [];
+         }
+         acc[entry.date].push(entry);
+         return acc;
+       },
+       {} as Record<string, Entry[]>
+     );
+   }, [entries]);
+
+   const entriesByDate = React.useMemo(() => {
+     // Sort entries within each day
+     const getCategoryOrder = (entry: Entry) => {
+       const details = entry.customDetails || {};
+       const type = details.type || entry.category;
+       if (type === 'flight' || entry.category === 'transport') return 0;
+       if (type === 'hotel' || entry.category === 'accommodation') return 1;
+       return 2; // activity
+     };
+
+     const sortEntries = (dayEntries: Entry[]) => {
+       return [...dayEntries].sort((a, b) => {
+         const aHasTime = a.timeStart || a.timeEnd;
+         const bHasTime = b.timeStart || b.timeEnd;
+
+         // Entries with time come first, sorted by timeStart
+         if (aHasTime && !bHasTime) return -1;
+         if (!aHasTime && bHasTime) return 1;
+         if (aHasTime && bHasTime) {
+           const aTime = a.timeStart || a.timeEnd || '';
+           const bTime = b.timeStart || b.timeEnd || '';
+           if (aTime !== bTime) return aTime.localeCompare(bTime);
+         }
+
+         // Both have no time: sort by category (Flight → Hotel → Activity)
+         const aCategoryOrder = getCategoryOrder(a);
+         const bCategoryOrder = getCategoryOrder(b);
+         if (aCategoryOrder !== bCategoryOrder) return aCategoryOrder - bCategoryOrder;
+
+         // Same category: sort alphabetically by title
+         return (a.title || '').localeCompare(b.title || '');
+       });
+     };
+
+     const sorted: Record<string, Entry[]> = {};
+     Object.keys(sortedEntriesByDate).forEach((date) => {
+       sorted[date] = sortEntries(sortedEntriesByDate[date]);
+     });
+     return sorted;
+   }, [sortedEntriesByDate]);
 
   const dayNumberFromDate = React.useCallback(
     (date: string) => {
@@ -135,27 +183,31 @@ export function EntriesList({
   );
 
   const openComposer = (type: Exclude<ComposerType, null>, dayNumber: number, date: string) => {
+    if (!canManageEntries) return;
     setComposer({ mode: 'create', type, dayNumber, date });
 
-    if (type === 'flight') {
-      setFlightForm({
-        origin: '',
-        destination: '',
-        pnr: '',
-        outboundFlightNumber: '',
-        outboundDepartureTime: '',
-        outboundArrivalTime: '',
-        outboundDepartureTimezone: '',
-        outboundArrivalTimezone: '',
-        isRoundTrip: false,
-        returnDate: date,
-        returnFlightNumber: '',
-        returnDepartureTime: '',
-        returnArrivalTime: '',
-        returnDepartureTimezone: '',
-        returnArrivalTimezone: '',
-      });
-    }
+     if (type === 'flight') {
+       setFlightForm({
+         origin: '',
+         destination: '',
+         pnr: '',
+         transportType: 'flight',
+         customTransportType: '',
+         outboundFlightNumber: '',
+         outboundDepartureTime: '',
+         outboundArrivalTime: '',
+         outboundDepartureTimezone: '',
+         outboundArrivalTimezone: '',
+         isRoundTrip: false,
+         showOnAllDays: false,
+         returnDate: date,
+         returnFlightNumber: '',
+         returnDepartureTime: '',
+         returnArrivalTime: '',
+         returnDepartureTimezone: '',
+         returnArrivalTimezone: '',
+       });
+     }
 
     if (type === 'hotel') {
       setHotelForm({
@@ -185,6 +237,7 @@ export function EntriesList({
   };
 
   const openComposerForEdit = (entry: Entry) => {
+    if (!canManageEntries) return;
     const details = entry.customDetails || {};
     const type = (details.type as ComposerType) ||
       (entry.category === 'transport'
@@ -203,37 +256,40 @@ export function EntriesList({
       date: entry.date,
     });
 
-    if (type === 'flight') {
-      const isCurrentOutbound = details.leg !== 'inbound';
-      const outboundDate = isCurrentOutbound ? entry.date : details.linkedOutboundDate || entry.date;
-      const linkedInbound = entries.find(
-        (e) =>
-          e.id !== entry.id &&
-          e.customDetails?.type === 'flight' &&
-          e.customDetails?.leg === 'inbound' &&
-          e.customDetails?.linkedOutboundDate === outboundDate
-      );
+     if (type === 'flight') {
+       const isCurrentOutbound = details.leg !== 'inbound';
+       const outboundDate = isCurrentOutbound ? entry.date : details.linkedOutboundDate || entry.date;
+       const linkedInbound = entries.find(
+         (e) =>
+           e.id !== entry.id &&
+           e.customDetails?.type === 'flight' &&
+           e.customDetails?.leg === 'inbound' &&
+           e.customDetails?.linkedOutboundDate === outboundDate
+       );
 
-      setFlightForm({
-        origin: details.origin || '',
-        destination: details.destination || '',
-        pnr: details.pnr || '',
-        outboundFlightNumber: details.flightNumber || '',
-        outboundDepartureTime: details.departureTime || entry.timeStart || '',
-        outboundArrivalTime: details.arrivalTime || entry.timeEnd || '',
-        outboundDepartureTimezone: details.departureTimezone || '',
-        outboundArrivalTimezone: details.arrivalTimezone || '',
-        isRoundTrip: Boolean(linkedInbound),
-        returnDate: linkedInbound?.date || entry.date,
-        returnFlightNumber: linkedInbound?.customDetails?.flightNumber || '',
-        returnDepartureTime:
-          linkedInbound?.customDetails?.departureTime || linkedInbound?.timeStart || '',
-        returnArrivalTime:
-          linkedInbound?.customDetails?.arrivalTime || linkedInbound?.timeEnd || '',
-        returnDepartureTimezone: linkedInbound?.customDetails?.departureTimezone || '',
-        returnArrivalTimezone: linkedInbound?.customDetails?.arrivalTimezone || '',
-      });
-    }
+       setFlightForm({
+         origin: details.origin || '',
+         destination: details.destination || '',
+         pnr: details.pnr || '',
+         transportType: details.transportType || 'flight',
+         customTransportType: details.customTransportType || '',
+         outboundFlightNumber: details.flightNumber || '',
+         outboundDepartureTime: details.departureTime || entry.timeStart || '',
+         outboundArrivalTime: details.arrivalTime || entry.timeEnd || '',
+         outboundDepartureTimezone: details.departureTimezone || '',
+         outboundArrivalTimezone: details.arrivalTimezone || '',
+         isRoundTrip: Boolean(linkedInbound),
+         showOnAllDays: details.showOnAllDays || false,
+         returnDate: linkedInbound?.date || entry.date,
+         returnFlightNumber: linkedInbound?.customDetails?.flightNumber || '',
+         returnDepartureTime:
+           linkedInbound?.customDetails?.departureTime || linkedInbound?.timeStart || '',
+         returnArrivalTime:
+           linkedInbound?.customDetails?.arrivalTime || linkedInbound?.timeEnd || '',
+         returnDepartureTimezone: linkedInbound?.customDetails?.departureTimezone || '',
+         returnArrivalTimezone: linkedInbound?.customDetails?.arrivalTimezone || '',
+       });
+     }
 
     if (type === 'hotel') {
       const hotelName = details.hotelName || entry.title.replace('Hotel: ', '');
@@ -290,168 +346,320 @@ export function EntriesList({
     }).map((d) => format(d, 'yyyy-MM-dd'));
   };
 
-  const handleCreateFlight = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!composer || composer.type !== 'flight') return;
+   const handleCreateFlight = async (e: React.FormEvent) => {
+     e.preventDefault();
+     if (!composer || composer.type !== 'flight') return;
 
-    if (!flightForm.origin || !flightForm.destination) {
-      window.alert('Please provide Origin and Destination.');
-      return;
-    }
+     if (!flightForm.origin || !flightForm.destination) {
+       window.alert('Please provide Origin and Destination.');
+       return;
+     }
 
-    if (flightForm.isRoundTrip && !flightForm.returnDate) {
-      window.alert('Please select return date for round trip.');
-      return;
-    }
+     if (flightForm.isRoundTrip && !flightForm.returnDate) {
+       window.alert('Please select return date for round trip.');
+       return;
+     }
 
-    const outboundEntry = {
-      dayNumber: composer.dayNumber,
-      date: composer.date,
-      title: `Flight: ${flightForm.origin} -> ${flightForm.destination}`,
-      description: flightForm.pnr
-        ? `PNR: ${flightForm.pnr}`
-        : flightForm.outboundFlightNumber
-          ? `Flight #: ${flightForm.outboundFlightNumber}`
-          : 'Flight segment',
-      location: '',
-      timeStart: flightForm.outboundDepartureTime || undefined,
-      timeEnd: flightForm.outboundArrivalTime || undefined,
-      category: 'transport',
-      customDetails: {
-        type: 'flight',
-        leg: 'outbound',
-        origin: flightForm.origin,
-        destination: flightForm.destination,
-        pnr: flightForm.pnr,
-        flightNumber: flightForm.outboundFlightNumber || '',
-        departureTime: flightForm.outboundDepartureTime || '',
-        arrivalTime: flightForm.outboundArrivalTime || '',
-        departureTimezone: flightForm.outboundDepartureTimezone || '',
-        arrivalTimezone: flightForm.outboundArrivalTimezone || '',
-      },
-    };
+     const transportTypeDisplay = flightForm.transportType === 'other' 
+       ? flightForm.customTransportType 
+       : flightForm.transportType.charAt(0).toUpperCase() + flightForm.transportType.slice(1);
 
-    const entriesToCreate: any[] = [outboundEntry];
+     const outboundEntry = {
+       dayNumber: composer.dayNumber,
+       date: composer.date,
+       title: `${transportTypeDisplay}: ${flightForm.origin} -> ${flightForm.destination}`,
+       description: flightForm.pnr
+         ? `PNR: ${flightForm.pnr}`
+         : flightForm.outboundFlightNumber
+           ? `#: ${flightForm.outboundFlightNumber}`
+           : `${transportTypeDisplay} segment`,
+       location: '',
+       timeStart: flightForm.outboundDepartureTime || undefined,
+       timeEnd: flightForm.outboundArrivalTime || undefined,
+       category: 'transport',
+       customDetails: {
+         type: 'flight',
+         leg: 'outbound',
+         transportType: flightForm.transportType,
+         customTransportType: flightForm.customTransportType,
+         origin: flightForm.origin,
+         destination: flightForm.destination,
+         pnr: flightForm.pnr,
+         flightNumber: flightForm.outboundFlightNumber || '',
+         departureTime: flightForm.outboundDepartureTime || '',
+         arrivalTime: flightForm.outboundArrivalTime || '',
+         departureTimezone: flightForm.outboundDepartureTimezone || '',
+         arrivalTimezone: flightForm.outboundArrivalTimezone || '',
+         showOnAllDays: flightForm.isRoundTrip && flightForm.showOnAllDays ? true : false,
+       },
+     };
 
-    if (flightForm.isRoundTrip && flightForm.returnDate) {
-      entriesToCreate.push({
-        dayNumber: dayNumberFromDate(flightForm.returnDate),
-        date: flightForm.returnDate,
-        title: `Return Flight: ${flightForm.destination} -> ${flightForm.origin}`,
-        description: flightForm.pnr
-          ? `PNR: ${flightForm.pnr}`
-          : flightForm.returnFlightNumber
-            ? `Flight #: ${flightForm.returnFlightNumber}`
-            : 'Return flight segment',
-        location: '',
-        timeStart: flightForm.returnDepartureTime || undefined,
-        timeEnd: flightForm.returnArrivalTime || undefined,
-        category: 'transport',
-        customDetails: {
-          type: 'flight',
-          leg: 'inbound',
-          origin: flightForm.destination,
-          destination: flightForm.origin,
-          pnr: flightForm.pnr,
-          flightNumber: flightForm.returnFlightNumber || '',
-          departureTime: flightForm.returnDepartureTime || '',
-          arrivalTime: flightForm.returnArrivalTime || '',
-          departureTimezone: flightForm.returnDepartureTimezone || '',
-          arrivalTimezone: flightForm.returnArrivalTimezone || '',
-          linkedOutboundDate: composer.date,
-        },
-      });
-    }
+     const entriesToCreate: any[] = [outboundEntry];
 
-    await onCreateEntries(entriesToCreate);
-    closeComposer();
-  };
+     // If showOnAllDays is enabled for round trip, add entry for all days between outbound and return
+     if (flightForm.isRoundTrip && flightForm.showOnAllDays && flightForm.returnDate) {
+       const allDaysInTrip = buildDatesInRange(composer.date, flightForm.returnDate);
+       
+       allDaysInTrip.forEach((date) => {
+         if (date !== composer.date && date !== flightForm.returnDate) {
+           entriesToCreate.push({
+             dayNumber: dayNumberFromDate(date),
+             date,
+             title: `${transportTypeDisplay}: ${flightForm.origin} -> ${flightForm.destination}`,
+             description: `${transportTypeDisplay} in transit`,
+             location: '',
+             timeStart: undefined,
+             timeEnd: undefined,
+             category: 'transport',
+             customDetails: {
+               type: 'flight',
+               leg: 'transit',
+               transportType: flightForm.transportType,
+               customTransportType: flightForm.customTransportType,
+               origin: flightForm.origin,
+               destination: flightForm.destination,
+               pnr: flightForm.pnr,
+               linkedOutboundDate: composer.date,
+               showOnAllDays: true,
+             },
+           });
+         }
+       });
+     }
 
-  const handleUpsertFlight = async (e: React.FormEvent) => {
-    if (composer?.mode === 'edit') {
-      e.preventDefault();
-      if (!composer.entryId) return;
+     if (flightForm.isRoundTrip && flightForm.returnDate) {
+       entriesToCreate.push({
+         dayNumber: dayNumberFromDate(flightForm.returnDate),
+         date: flightForm.returnDate,
+         title: `${transportTypeDisplay}: ${flightForm.destination} -> ${flightForm.origin}`,
+         description: flightForm.pnr
+           ? `PNR: ${flightForm.pnr}`
+           : flightForm.returnFlightNumber
+             ? `#: ${flightForm.returnFlightNumber}`
+             : `Return ${transportTypeDisplay} segment`,
+         location: '',
+         timeStart: flightForm.returnDepartureTime || undefined,
+         timeEnd: flightForm.returnArrivalTime || undefined,
+         category: 'transport',
+         customDetails: {
+           type: 'flight',
+           leg: 'inbound',
+           transportType: flightForm.transportType,
+           customTransportType: flightForm.customTransportType,
+           origin: flightForm.destination,
+           destination: flightForm.origin,
+           pnr: flightForm.pnr,
+           flightNumber: flightForm.returnFlightNumber || '',
+           departureTime: flightForm.returnDepartureTime || '',
+           arrivalTime: flightForm.returnArrivalTime || '',
+           departureTimezone: flightForm.returnDepartureTimezone || '',
+           arrivalTimezone: flightForm.returnArrivalTimezone || '',
+           linkedOutboundDate: composer.date,
+           showOnAllDays: flightForm.showOnAllDays ? true : false,
+         },
+       });
+     }
 
-      if (!flightForm.origin || !flightForm.destination) {
-        window.alert('Please provide Origin and Destination.');
-        return;
-      }
+     await onCreateEntries(entriesToCreate);
+     closeComposer();
+   };
 
-      await onUpdateEntry(composer.entryId, {
-        date: composer.date,
-        dayNumber: composer.dayNumber,
-        title: `Flight: ${flightForm.origin} -> ${flightForm.destination}`,
-        description: flightForm.pnr
-          ? `PNR: ${flightForm.pnr}`
-          : flightForm.outboundFlightNumber
-            ? `Flight #: ${flightForm.outboundFlightNumber}`
-            : 'Flight segment',
-        timeStart: flightForm.outboundDepartureTime || undefined,
-        timeEnd: flightForm.outboundArrivalTime || undefined,
-        category: 'transport',
-        customDetails: {
-          type: 'flight',
-          origin: flightForm.origin,
-          destination: flightForm.destination,
-          pnr: flightForm.pnr,
-          flightNumber: flightForm.outboundFlightNumber || '',
-          departureTime: flightForm.outboundDepartureTime || '',
-          arrivalTime: flightForm.outboundArrivalTime || '',
-          departureTimezone: flightForm.outboundDepartureTimezone || '',
-          arrivalTimezone: flightForm.outboundArrivalTimezone || '',
-        },
-      });
+   const handleUpsertFlight = async (e: React.FormEvent) => {
+     if (composer?.mode === 'edit') {
+       e.preventDefault();
+       if (!composer.entryId) return;
 
-      if (flightForm.isRoundTrip && flightForm.returnDate) {
-        const linkedReturnEntry = entries.find(
-          (e) =>
-            e.id !== composer.entryId &&
-            e.customDetails?.type === 'flight' &&
-            e.customDetails?.leg === 'inbound' &&
-            (e.customDetails?.linkedOutboundDate === composer.date ||
-              (flightForm.pnr && e.customDetails?.pnr === flightForm.pnr))
-        );
+       if (!flightForm.origin || !flightForm.destination) {
+         window.alert('Please provide Origin and Destination.');
+         return;
+       }
 
-        const returnPayload = {
-          dayNumber: dayNumberFromDate(flightForm.returnDate),
-          date: flightForm.returnDate,
-          title: `Return Flight: ${flightForm.destination} -> ${flightForm.origin}`,
-          description: flightForm.pnr
-            ? `PNR: ${flightForm.pnr}`
-            : flightForm.returnFlightNumber
-              ? `Flight #: ${flightForm.returnFlightNumber}`
-              : 'Return flight segment',
-          timeStart: flightForm.returnDepartureTime || undefined,
-          timeEnd: flightForm.returnArrivalTime || undefined,
-          category: 'transport',
-          customDetails: {
-            type: 'flight',
-            leg: 'inbound',
-            origin: flightForm.destination,
-            destination: flightForm.origin,
-            pnr: flightForm.pnr,
-            flightNumber: flightForm.returnFlightNumber || '',
-            departureTime: flightForm.returnDepartureTime || '',
-            arrivalTime: flightForm.returnArrivalTime || '',
-            departureTimezone: flightForm.returnDepartureTimezone || '',
-            arrivalTimezone: flightForm.returnArrivalTimezone || '',
-            linkedOutboundDate: composer.date,
-          },
+        if (flightForm.isRoundTrip && !flightForm.returnDate) {
+          window.alert('Please select return date for round trip.');
+          return;
+        }
+
+       const transportTypeDisplay = flightForm.transportType === 'other' 
+         ? flightForm.customTransportType 
+         : flightForm.transportType.charAt(0).toUpperCase() + flightForm.transportType.slice(1);
+
+       const currentEntry = entries.find(e => e.id === composer.entryId);
+       const details = currentEntry?.customDetails || {};
+        const outboundDate =
+          details.leg === 'inbound' || details.leg === 'transit'
+            ? details.linkedOutboundDate || currentEntry?.date || composer.date
+            : currentEntry?.date || composer.date;
+
+        const relatedTransportEntries = entries.filter((e) => {
+         const d = e.customDetails || {};
+         if (d.type !== 'flight') return false;
+
+          if (flightForm.pnr && d.pnr === flightForm.pnr) {
+            return true;
+          }
+
+          if (d.leg === 'outbound' && !d.linkedOutboundDate) {
+           return e.date === outboundDate;
+         }
+         if (d.leg === 'inbound' && d.linkedOutboundDate === outboundDate) {
+           return true;
+         }
+         if (d.leg === 'transit' && d.linkedOutboundDate === outboundDate) {
+           return true;
+         }
+         if (d.leg === 'outbound' && e.date === outboundDate) {
+           return true;
+         }
+         return false;
+       });
+
+        const fallbackCurrent = currentEntry || entries.find((e) => e.id === composer.entryId);
+        const entriesInScope =
+          relatedTransportEntries.length > 0
+            ? relatedTransportEntries
+            : fallbackCurrent
+              ? [fallbackCurrent]
+              : [];
+
+        type LegType = 'outbound' | 'transit' | 'inbound';
+        type ExpectedEntry = { leg: LegType; date: string };
+
+        const expectedEntries: ExpectedEntry[] = [{ leg: 'outbound', date: outboundDate }];
+
+        if (flightForm.isRoundTrip && flightForm.returnDate) {
+          if (flightForm.showOnAllDays) {
+            const allDays = buildDatesInRange(outboundDate, flightForm.returnDate);
+            allDays.forEach((date) => {
+              if (date !== outboundDate && date !== flightForm.returnDate) {
+                expectedEntries.push({ leg: 'transit', date });
+              }
+            });
+          }
+          expectedEntries.push({ leg: 'inbound', date: flightForm.returnDate });
+        }
+
+        const keyedExisting = new Map<string, Entry[]>();
+        entriesInScope.forEach((entry) => {
+          const leg = (entry.customDetails?.leg || 'outbound') as LegType;
+          const key = `${leg}:${entry.date}`;
+          const list = keyedExisting.get(key) || [];
+          list.push(entry);
+          keyedExisting.set(key, list);
+        });
+
+        const buildFlightPayload = (leg: LegType, date: string) => {
+          const isOutbound = leg === 'outbound';
+          const isTransit = leg === 'transit';
+          const isInbound = leg === 'inbound';
+          const isMultiDayShown = flightForm.isRoundTrip && flightForm.showOnAllDays;
+
+          return {
+            date,
+            dayNumber: dayNumberFromDate(date),
+            title: isInbound
+              ? `${transportTypeDisplay}: ${flightForm.destination} -> ${flightForm.origin}`
+              : `${transportTypeDisplay}: ${flightForm.origin} -> ${flightForm.destination}`,
+            description: flightForm.pnr
+              ? `PNR: ${flightForm.pnr}`
+              : isOutbound && flightForm.outboundFlightNumber
+                ? `#: ${flightForm.outboundFlightNumber}`
+                : isInbound && flightForm.returnFlightNumber
+                  ? `#: ${flightForm.returnFlightNumber}`
+                  : isTransit
+                    ? `${transportTypeDisplay} in transit`
+                    : isInbound
+                      ? `Return ${transportTypeDisplay} segment`
+                      : `${transportTypeDisplay} segment`,
+            location: '',
+            timeStart: isOutbound
+              ? flightForm.outboundDepartureTime || undefined
+              : isInbound
+                ? flightForm.returnDepartureTime || undefined
+                : undefined,
+            timeEnd: isOutbound
+              ? flightForm.outboundArrivalTime || undefined
+              : isInbound
+                ? flightForm.returnArrivalTime || undefined
+                : undefined,
+            category: 'transport',
+            customDetails: {
+              type: 'flight',
+              leg,
+              transportType: flightForm.transportType,
+              customTransportType: flightForm.customTransportType,
+              origin: isInbound ? flightForm.destination : flightForm.origin,
+              destination: isInbound ? flightForm.origin : flightForm.destination,
+              pnr: flightForm.pnr,
+              flightNumber: isOutbound
+                ? flightForm.outboundFlightNumber || ''
+                : isInbound
+                  ? flightForm.returnFlightNumber || ''
+                  : '',
+              departureTime: isOutbound
+                ? flightForm.outboundDepartureTime || ''
+                : isInbound
+                  ? flightForm.returnDepartureTime || ''
+                  : '',
+              arrivalTime: isOutbound
+                ? flightForm.outboundArrivalTime || ''
+                : isInbound
+                  ? flightForm.returnArrivalTime || ''
+                  : '',
+              departureTimezone: isOutbound
+                ? flightForm.outboundDepartureTimezone || ''
+                : isInbound
+                  ? flightForm.returnDepartureTimezone || ''
+                  : '',
+              arrivalTimezone: isOutbound
+                ? flightForm.outboundArrivalTimezone || ''
+                : isInbound
+                  ? flightForm.returnArrivalTimezone || ''
+                  : '',
+              linkedOutboundDate: isOutbound ? undefined : outboundDate,
+              showOnAllDays: isTransit ? true : isMultiDayShown,
+            },
+          };
         };
 
-        if (linkedReturnEntry) {
-          await onUpdateEntry(linkedReturnEntry.id, returnPayload);
-        } else {
-          await onCreateEntries([returnPayload]);
+        const updates: Promise<void>[] = [];
+        const creates: any[] = [];
+
+        expectedEntries.forEach(({ leg, date }) => {
+          const key = `${leg}:${date}`;
+          const candidates = keyedExisting.get(key) || [];
+          const existing = candidates.shift();
+          if (candidates.length > 0) {
+            keyedExisting.set(key, candidates);
+          } else {
+            keyedExisting.delete(key);
+          }
+
+          const payload = buildFlightPayload(leg, date);
+          if (existing) {
+            updates.push(onUpdateEntry(existing.id, payload));
+          } else {
+            creates.push(payload);
+          }
+        });
+
+        const staleEntries = Array.from(keyedExisting.values()).flat();
+
+        if (updates.length > 0) {
+          await Promise.all(updates);
         }
-      }
+        if (creates.length > 0) {
+          await onCreateEntries(creates);
+        }
+        if (onDeleteEntryById && staleEntries.length > 0) {
+          await Promise.all(staleEntries.map((entry) => onDeleteEntryById(entry.id)));
+        }
 
-      closeComposer();
-      return;
-    }
+       closeComposer();
+       return;
+     }
 
-    await handleCreateFlight(e);
-  };
+     await handleCreateFlight(e);
+   };
 
   const handleCreateHotel = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -496,45 +704,68 @@ export function EntriesList({
     closeComposer();
   };
 
-  const handleUpsertHotel = async (e: React.FormEvent) => {
-    if (composer?.mode === 'edit') {
-      e.preventDefault();
-      if (!composer.entryId) return;
-
-      if (!hotelForm.hotelName || !hotelForm.checkInDate || !hotelForm.checkOutDate) {
-        window.alert('Please provide Hotel Name, Check-in Date, and Check-out Date.');
-        return;
-      }
-
-      await onUpdateEntry(composer.entryId, {
-        date: composer.date,
-        dayNumber: composer.dayNumber,
-        title: `Hotel: ${hotelForm.hotelName}`,
-        description: hotelForm.reservationNumber
-          ? `Reservation: ${hotelForm.reservationNumber}`
-          : 'Hotel stay',
-        location: hotelForm.address || undefined,
-        timeStart: hotelForm.checkInTime || undefined,
-        timeEnd: hotelForm.checkOutTime || undefined,
-        category: 'accommodation',
-        customDetails: {
-          type: 'hotel',
-          hotelName: hotelForm.hotelName,
-          checkInDate: hotelForm.checkInDate,
-          checkOutDate: hotelForm.checkOutDate,
-          checkInTime: hotelForm.checkInTime || '',
-          checkOutTime: hotelForm.checkOutTime || '',
-          address: hotelForm.address,
-          contactNumber: hotelForm.contactNumber,
-          reservationNumber: hotelForm.reservationNumber,
-        },
-      });
-      closeComposer();
-      return;
-    }
-
-    await handleCreateHotel(e);
-  };
+   const handleUpsertHotel = async (e: React.FormEvent) => {
+     if (composer?.mode === 'edit') {
+       e.preventDefault();
+       if (!composer.entryId) return;
+ 
+       if (!hotelForm.hotelName || !hotelForm.checkInDate || !hotelForm.checkOutDate) {
+         window.alert('Please provide Hotel Name, Check-in Date, and Check-out Date.');
+         return;
+       }
+ 
+       // Find all related hotel entries with the same stay details
+       const relatedHotelEntries = entries.filter((e) => {
+         const d = e.customDetails || {};
+         return (
+           d.type === 'hotel' &&
+           (d.hotelName || e.title.replace('Hotel: ', '')) === hotelForm.hotelName &&
+           (d.checkInDate || e.date) === hotelForm.checkInDate &&
+           (d.checkOutDate || e.date) === hotelForm.checkOutDate
+         );
+       });
+ 
+       // Update all related hotel entries with new details
+       const customDetails = {
+         type: 'hotel',
+         hotelName: hotelForm.hotelName,
+         checkInDate: hotelForm.checkInDate,
+         checkOutDate: hotelForm.checkOutDate,
+         checkInTime: hotelForm.checkInTime || '',
+         checkOutTime: hotelForm.checkOutTime || '',
+         address: hotelForm.address,
+         contactNumber: hotelForm.contactNumber,
+         reservationNumber: hotelForm.reservationNumber,
+       };
+ 
+       // Update each related entry
+       await Promise.all(
+         relatedHotelEntries.map((entry) => {
+           const isCheckInDay = entry.date === hotelForm.checkInDate;
+           const isCheckOutDay = entry.date === hotelForm.checkOutDate;
+ 
+           return onUpdateEntry(entry.id, {
+             date: entry.date,
+             dayNumber: entry.dayNumber,
+             title: `Hotel: ${hotelForm.hotelName}`,
+             description: hotelForm.reservationNumber
+               ? `Reservation: ${hotelForm.reservationNumber}`
+               : 'Hotel stay',
+             location: hotelForm.address || undefined,
+             timeStart: isCheckInDay ? hotelForm.checkInTime || undefined : undefined,
+             timeEnd: isCheckOutDay ? hotelForm.checkOutTime || undefined : undefined,
+             category: 'accommodation',
+             customDetails,
+           });
+         })
+       );
+ 
+       closeComposer();
+       return;
+     }
+ 
+     await handleCreateHotel(e);
+   };
 
   const handleCreateActivity = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -634,6 +865,7 @@ export function EntriesList({
   };
 
   const handleAddEntryFromHeader = (dayNumber: number, date: string) => {
+    if (!canManageEntries) return;
     setHeaderAddPicker((prev) =>
       prev?.dayNumber === dayNumber ? null : { dayNumber, date }
     );
@@ -644,6 +876,7 @@ export function EntriesList({
     date: string,
     type: Exclude<ComposerType, null>
   ) => {
+    if (!canManageEntries) return;
     setHeaderAddPicker(null);
     setExpandedDays((prev) => ({ ...prev, [dayNumber]: true }));
     openComposer(type, dayNumber, date);
@@ -700,26 +933,26 @@ export function EntriesList({
     return 'Time not set';
   };
 
-  const renderFlightDetails = (entry: Entry) => {
-    const details = entry.customDetails || {};
-    if (details.type !== 'flight') return null;
+   const renderFlightDetails = (entry: Entry) => {
+     const details = entry.customDetails || {};
+     if (details.type !== 'flight') return null;
 
-    const legLabel = details.leg === 'inbound' ? 'Return Flight' : 'Outbound Flight';
-    const route = details.origin && details.destination ? `${details.origin} -> ${details.destination}` : '';
-    const departureMeta = details.departureTimezone ? `${entry.timeStart || ''} (${details.departureTimezone})` : entry.timeStart || '';
-    const arrivalMeta = details.arrivalTimezone ? `${entry.timeEnd || ''} (${details.arrivalTimezone})` : entry.timeEnd || '';
+     const legLabel = details.leg === 'inbound' ? 'Return' : 'Outbound';
+     const route = details.origin && details.destination ? `${details.origin} -> ${details.destination}` : '';
+     const departureMeta = details.departureTimezone ? `${entry.timeStart || ''} (${details.departureTimezone})` : entry.timeStart || '';
+     const arrivalMeta = details.arrivalTimezone ? `${entry.timeEnd || ''} (${details.arrivalTimezone})` : entry.timeEnd || '';
 
-    return (
-      <div className="mb-2 text-sm text-gray-700 space-y-1">
-        <p className="font-medium text-gray-800">✈️ {legLabel}</p>
-        {route && <p>Route: {route}</p>}
-        {details.flightNumber && <p>Flight #: {details.flightNumber}</p>}
-        {details.pnr && <p>PNR: {details.pnr}</p>}
-        {(entry.timeStart || details.departureTimezone) && <p>Departure: {departureMeta || '-'}</p>}
-        {(entry.timeEnd || details.arrivalTimezone) && <p>Arrival: {arrivalMeta || '-'}</p>}
-      </div>
-    );
-  };
+     return (
+       <div className="mb-2 text-sm text-gray-700 space-y-1">
+         <p className="font-medium text-gray-800">✈️ {legLabel}</p>
+         {route && <p>Route: {route}</p>}
+         {details.flightNumber && <p>{legLabel} #: {details.flightNumber}</p>}
+         {details.pnr && <p>Reservation PNR: {details.pnr}</p>}
+         {(entry.timeStart || details.departureTimezone) && <p>Departure: {departureMeta || '-'}</p>}
+         {(entry.timeEnd || details.arrivalTimezone) && <p>Arrival: {arrivalMeta || '-'}</p>}
+       </div>
+     );
+   };
 
   const renderHotelDetails = (entry: Entry) => {
     const details = entry.customDetails || {};
@@ -756,29 +989,29 @@ export function EntriesList({
     );
   };
 
-  const summarizeEntryForDayHeader = (entry: Entry) => {
-    const details = entry.customDetails || {};
+   const summarizeEntryForDayHeader = (entry: Entry) => {
+     const details = entry.customDetails || {};
 
-    if (details.type === 'flight') {
-      const from = details.origin || 'Airport';
-      const to = details.destination || 'Airport';
-      return `✈️ Flying From ${from} to ${to}`;
-    }
+     if (details.type === 'flight') {
+       const from = details.origin || 'Airport';
+       const to = details.destination || 'Airport';
+       return `✈️ Travelling From ${from} to ${to}`;
+     }
 
-    if (details.type === 'hotel') {
-      const hotelName = details.hotelName || 'hotel';
-      return `🏨 Staying at ${hotelName}`;
-    }
+     if (details.type === 'hotel') {
+       const hotelName = details.hotelName || 'hotel';
+       return `🏨 Staying at ${hotelName}`;
+     }
 
-    if (details.type === 'activity') {
-      const activityName = details.activityName || entry.title.replace('Activity: ', '');
-      return `🎯 Activity: ${activityName}`;
-    }
+     if (details.type === 'activity') {
+       const activityName = details.activityName || entry.title.replace('Activity: ', '');
+       return `🎯 Activity: ${activityName}`;
+     }
 
-    if (entry.category === 'transport') return `✈️ Travel: ${entry.title}`;
-    if (entry.category === 'accommodation') return `🏨 Stay: ${entry.title}`;
-    return `${getEntryIcon(entry)} ${entry.title}`;
-  };
+     if (entry.category === 'transport') return `✈️ Travelling: ${entry.title}`;
+     if (entry.category === 'accommodation') return `🏨 Stay: ${entry.title}`;
+     return `${getEntryIcon(entry)} ${entry.title}`;
+   };
 
   return (
     <div className="space-y-6">
@@ -808,8 +1041,8 @@ export function EntriesList({
                 isPickerOpen ? 'z-50' : 'z-0'
               }`}
             >
-              <div className="w-full px-4 py-4 flex items-center justify-between text-left hover:bg-violet-50/60 transition">
-                <div className="flex items-start gap-3">
+              <div className="w-full px-4 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-left hover:bg-violet-50/60 transition">
+                <div className="flex items-start gap-3 min-w-0">
                   <button
                     type="button"
                     onClick={() => toggleDay(dayNumber)}
@@ -819,24 +1052,26 @@ export function EntriesList({
                     {isExpanded ? '-' : '+'}
                   </button>
                   <div>
-                    <h3 className="text-lg font-bold text-violet-900">
+                    <h3 className="text-base sm:text-lg font-bold text-violet-900">
                       Day {dayNumber} - {format(dateObj, 'MMM dd, yyyy')}
                     </h3>
-                    <p className="text-sm text-violet-600 truncate max-w-[38rem]">{entryPreview}</p>
+                    <p className="text-sm text-violet-600 truncate max-w-[16rem] sm:max-w-[38rem]">{entryPreview}</p>
                   </div>
                 </div>
 
                 {!isExpanded && (
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => handleAddEntryFromHeader(dayNumber, dateKey)}
-                      className="px-3 py-1.5 text-xs font-semibold bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white rounded-full hover:from-violet-600 hover:to-fuchsia-600"
-                    >
-                      + Add Entry
-                    </button>
+                  <div className="relative self-end sm:self-auto">
+                    {canManageEntries ? (
+                      <button
+                        type="button"
+                        onClick={() => handleAddEntryFromHeader(dayNumber, dateKey)}
+                        className="px-3 py-1.5 text-xs font-semibold bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white rounded-full hover:from-violet-600 hover:to-fuchsia-600"
+                      >
+                        + Add Entry
+                      </button>
+                    ) : null}
 
-                    {headerAddPicker?.dayNumber === dayNumber && (
+                    {canManageEntries && headerAddPicker?.dayNumber === dayNumber && (
                       <div className="absolute right-0 top-full z-50 mt-2 w-44 rounded-xl border border-violet-200 bg-white p-2 shadow-2xl">
                         <p className="px-2 pb-2 text-[11px] font-semibold text-violet-700">Choose entry type</p>
                         <button
@@ -844,7 +1079,7 @@ export function EntriesList({
                           onClick={() => handleAddEntryTypeFromHeader(dayNumber, dateKey, 'flight')}
                           className="w-full text-left px-2 py-1.5 text-sm rounded hover:bg-green-50 text-green-700"
                         >
-                          ✈️ Flight
+                          🚌 Transport
                         </button>
                         <button
                           type="button"
@@ -868,62 +1103,92 @@ export function EntriesList({
 
               {isExpanded && (
                 <div className="px-4 pb-4 border-t border-violet-100">
-                  <div className="pt-4 pb-2 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => openComposer('flight', dayNumber, dateKey)}
-                      className="px-3 py-1.5 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200"
-                    >
-                      + Flight
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => openComposer('hotel', dayNumber, dateKey)}
-                      className="px-3 py-1.5 text-sm bg-purple-100 text-purple-700 rounded hover:bg-purple-200"
-                    >
-                      + Hotel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => openComposer('activity', dayNumber, dateKey)}
-                      className="px-3 py-1.5 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
-                    >
-                      + Activity
-                    </button>
-                  </div>
+                  {canManageEntries ? (
+                    <div className="pt-4 pb-2 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openComposer('flight', dayNumber, dateKey)}
+                        className="px-3 py-1.5 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200"
+                      >
+                        + Transport
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openComposer('hotel', dayNumber, dateKey)}
+                        className="px-3 py-1.5 text-sm bg-purple-100 text-purple-700 rounded hover:bg-purple-200"
+                      >
+                        + Hotel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openComposer('activity', dayNumber, dateKey)}
+                        className="px-3 py-1.5 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                      >
+                        + Activity
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="pt-4 pb-2 text-xs text-violet-600">Read-only public itinerary.</p>
+                  )}
 
-                  {composer?.dayNumber === dayNumber && composer.type === 'flight' && (
-                    <form onSubmit={handleUpsertFlight} className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg space-y-3">
-                      <h4 className="font-semibold text-green-900">
-                        {composer.mode === 'edit' ? 'Edit Flight' : `Add Flight for ${format(dateObj, 'MMM dd')}`}
-                      </h4>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="relative">
-                          <input
-                            type="text"
-                            placeholder="Origin"
-                            value={flightForm.origin}
-                            onChange={(e) => setFlightForm((p) => ({ ...p, origin: e.target.value }))}
-                            className="w-full px-3 py-2 pr-9 border border-gray-300 rounded"
-                            required
-                          />
-                          <RequiredMark />
-                        </div>
-                        <div className="relative">
-                          <input
-                            type="text"
-                            placeholder="Destination"
-                            value={flightForm.destination}
-                            onChange={(e) =>
-                              setFlightForm((p) => ({ ...p, destination: e.target.value }))
-                            }
-                            className="w-full px-3 py-2 pr-9 border border-gray-300 rounded"
-                            required
-                          />
-                          <RequiredMark />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
+                   {canManageEntries && composer?.dayNumber === dayNumber && composer.type === 'flight' && (
+                     <form onSubmit={handleUpsertFlight} className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg space-y-3">
+                       <h4 className="font-semibold text-green-900">
+                         {composer.mode === 'edit' ? 'Edit Transport' : `Add Transport for ${format(dateObj, 'MMM dd')}`}
+                       </h4>
+                       <div>
+                         <label className="block text-sm font-medium text-gray-700 mb-1">Transport Type</label>
+                         <select
+                           value={flightForm.transportType}
+                           onChange={(e) => setFlightForm((p) => ({ ...p, transportType: e.target.value as any }))}
+                           className="w-full px-3 py-2 border border-gray-300 rounded"
+                         >
+                           <option value="flight">Flight</option>
+                           <option value="bus">Bus</option>
+                           <option value="train">Train</option>
+                           <option value="other">Other</option>
+                         </select>
+                       </div>
+                       {flightForm.transportType === 'other' && (
+                         <div>
+                           <label className="block text-sm font-medium text-gray-700 mb-1">Transport Type Name</label>
+                           <input
+                             type="text"
+                             placeholder="e.g., Car, Taxi, Ferry"
+                             value={flightForm.customTransportType}
+                             onChange={(e) => setFlightForm((p) => ({ ...p, customTransportType: e.target.value }))}
+                             className="w-full px-3 py-2 border border-gray-300 rounded"
+                             required
+                           />
+                         </div>
+                       )}
+                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                         <div className="relative">
+                           <input
+                             type="text"
+                             placeholder="Origin"
+                             value={flightForm.origin}
+                             onChange={(e) => setFlightForm((p) => ({ ...p, origin: e.target.value }))}
+                             className="w-full px-3 py-2 pr-9 border border-gray-300 rounded"
+                             required
+                           />
+                           <RequiredMark />
+                         </div>
+                         <div className="relative">
+                           <input
+                             type="text"
+                             placeholder="Destination"
+                             value={flightForm.destination}
+                             onChange={(e) =>
+                               setFlightForm((p) => ({ ...p, destination: e.target.value }))
+                             }
+                             className="w-full px-3 py-2 pr-9 border border-gray-300 rounded"
+                             required
+                           />
+                           <RequiredMark />
+                         </div>
+                       </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <input
                           type="text"
                           placeholder="Flight PNR (optional)"
@@ -941,7 +1206,7 @@ export function EntriesList({
                           className="px-3 py-2 border border-gray-300 rounded"
                         />
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <input
                           type="time"
                           value={flightForm.outboundDepartureTime}
@@ -959,7 +1224,7 @@ export function EntriesList({
                           className="px-3 py-2 border border-gray-300 rounded"
                         />
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <input
                           type="text"
                           placeholder="Departure Time Zone (optional)"
@@ -980,20 +1245,33 @@ export function EntriesList({
                         />
                       </div>
 
-                      <label className="flex items-center gap-2 text-sm text-gray-700">
-                        <input
-                          type="checkbox"
-                          checked={flightForm.isRoundTrip}
-                          onChange={(e) =>
-                            setFlightForm((p) => ({ ...p, isRoundTrip: e.target.checked }))
-                          }
-                        />
-                        Round trip
-                      </label>
+                       <label className="flex items-center gap-2 text-sm text-gray-700">
+                         <input
+                           type="checkbox"
+                           checked={flightForm.isRoundTrip}
+                           onChange={(e) =>
+                             setFlightForm((p) => ({ ...p, isRoundTrip: e.target.checked }))
+                           }
+                         />
+                         Round trip
+                       </label>
+
+                       {flightForm.isRoundTrip && (
+                         <label className="flex items-center gap-2 text-sm text-gray-700">
+                           <input
+                             type="checkbox"
+                             checked={flightForm.showOnAllDays}
+                             onChange={(e) =>
+                               setFlightForm((p) => ({ ...p, showOnAllDays: e.target.checked }))
+                             }
+                           />
+                           Show on all days between outbound and return
+                         </label>
+                       )}
 
                       {flightForm.isRoundTrip && (
                         <>
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                               <div className="relative">
                                 <input
                                   type="date"
@@ -1018,7 +1296,7 @@ export function EntriesList({
                               className="px-3 py-2 border border-gray-300 rounded"
                             />
                           </div>
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <input
                               type="time"
                               value={flightForm.returnDepartureTime}
@@ -1036,7 +1314,7 @@ export function EntriesList({
                               className="px-3 py-2 border border-gray-300 rounded"
                             />
                           </div>
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <input
                               type="text"
                               placeholder="Return Departure Time Zone (optional)"
@@ -1059,18 +1337,18 @@ export function EntriesList({
                         </>
                       )}
 
-                      <div className="flex gap-2">
-                        <button type="submit" disabled={isLoading} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400">
-                          {composer.mode === 'edit' ? 'Update Flight' : 'Save Flight'}
-                        </button>
-                        <button type="button" onClick={closeComposer} className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">
-                          Cancel
-                        </button>
-                      </div>
+                       <div className="flex flex-col sm:flex-row gap-2">
+                         <button type="submit" disabled={isLoading} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400">
+                           {composer.mode === 'edit' ? 'Update Transport' : 'Save Transport'}
+                         </button>
+                         <button type="button" onClick={closeComposer} className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">
+                           Cancel
+                         </button>
+                       </div>
                     </form>
                   )}
 
-                  {composer?.dayNumber === dayNumber && composer.type === 'hotel' && (
+                  {canManageEntries && composer?.dayNumber === dayNumber && composer.type === 'hotel' && (
                     <form onSubmit={handleUpsertHotel} className="mb-4 p-4 bg-purple-50 border border-purple-200 rounded-lg space-y-3">
                       <h4 className="font-semibold text-purple-900">
                         {composer.mode === 'edit' ? 'Edit Hotel Stay' : 'Add Hotel Stay'}
@@ -1086,7 +1364,7 @@ export function EntriesList({
                         />
                         <RequiredMark />
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="relative">
                           <input
                             type="date"
@@ -1112,7 +1390,7 @@ export function EntriesList({
                           <RequiredMark />
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <input
                           type="time"
                           value={hotelForm.checkInTime}
@@ -1126,7 +1404,7 @@ export function EntriesList({
                           className="px-3 py-2 border border-gray-300 rounded"
                         />
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <input
                           type="text"
                           placeholder="Address"
@@ -1151,7 +1429,7 @@ export function EntriesList({
                         }
                         className="w-full px-3 py-2 border border-gray-300 rounded"
                       />
-                      <div className="flex gap-2">
+                      <div className="flex flex-col sm:flex-row gap-2">
                         <button type="submit" disabled={isLoading} className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:bg-gray-400">
                           {composer.mode === 'edit' ? 'Update Hotel' : 'Save Hotel'}
                         </button>
@@ -1162,7 +1440,7 @@ export function EntriesList({
                     </form>
                   )}
 
-                  {composer?.dayNumber === dayNumber && composer.type === 'activity' && (
+                  {canManageEntries && composer?.dayNumber === dayNumber && composer.type === 'activity' && (
                     <form onSubmit={handleUpsertActivity} className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
                       <h4 className="font-semibold text-blue-900">
                         {composer.mode === 'edit' ? 'Edit Activity' : 'Add Activity'}
@@ -1183,7 +1461,7 @@ export function EntriesList({
                       <p className="text-xs text-blue-700 bg-blue-100 border border-blue-200 px-3 py-2 rounded">
                         Activity Date: {format(dateObj, 'MMM dd, yyyy')} (auto-selected from this day)
                       </p>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <input
                           type="time"
                           value={activityForm.startTime}
@@ -1199,7 +1477,7 @@ export function EntriesList({
                           className="px-3 py-2 border border-gray-300 rounded"
                         />
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <input
                           type="text"
                           placeholder="Activity Address"
@@ -1233,7 +1511,7 @@ export function EntriesList({
                         className="w-full px-3 py-2 border border-gray-300 rounded"
                         rows={2}
                       />
-                      <div className="flex gap-2">
+                      <div className="flex flex-col sm:flex-row gap-2">
                         <button type="submit" disabled={isLoading} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400">
                           {composer.mode === 'edit' ? 'Update Activity' : 'Save Activity'}
                         </button>
@@ -1304,15 +1582,15 @@ export function EntriesList({
                                   </div>
                                 ) : null}
 
-                                <div className="flex items-start justify-between mb-2">
-                                  <div>
+                                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-2">
+                                  <div className="min-w-0">
                                     <h4 className="font-semibold text-gray-900">
                                       {getEntryIcon(entry)} {entry.title}
                                     </h4>
                                     {entry.location && <p className="text-sm text-gray-600">📍 {entry.location}</p>}
                                   </div>
                                   <span
-                                    className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                    className={`px-3 py-1 rounded-full text-xs font-medium w-fit ${
                                       categoryColors[entry.category] || categoryColors.other
                                     }`}
                                   >
@@ -1333,22 +1611,24 @@ export function EntriesList({
                                   </p>
                                 )}
 
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={() => openComposerForEdit(entry)}
-                                    disabled={isLoading}
-                                    className="px-3 py-1 text-sm bg-blue-50 text-blue-600 rounded hover:bg-blue-100 disabled:opacity-50"
-                                  >
-                                    Edit
-                                  </button>
-                                  <button
-                                    onClick={() => onDelete(entry)}
-                                    disabled={isLoading}
-                                    className="px-3 py-1 text-sm bg-red-50 text-red-600 rounded hover:bg-red-100 disabled:opacity-50"
-                                  >
-                                    Delete
-                                  </button>
-                                </div>
+                                {canManageEntries ? (
+                                  <div className="flex flex-col sm:flex-row gap-2">
+                                    <button
+                                      onClick={() => openComposerForEdit(entry)}
+                                      disabled={isLoading}
+                                      className="px-3 py-1 text-sm bg-blue-50 text-blue-600 rounded hover:bg-blue-100 disabled:opacity-50"
+                                    >
+                                      Edit
+                                    </button>
+                                    <button
+                                      onClick={() => onDelete(entry)}
+                                      disabled={isLoading}
+                                      className="px-3 py-1 text-sm bg-red-50 text-red-600 rounded hover:bg-red-100 disabled:opacity-50"
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                ) : null}
                               </>
                             );
                           })()}

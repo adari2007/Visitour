@@ -1,0 +1,15 @@
+{
+  "environments": {
+    "production": {
+      "variables": {
+        "NODE_ENV": "production"
+      }
+    },
+    "development": {
+      "variables": {
+        "NODE_ENV": "development"
+      }
+    }
+  }
+}
+

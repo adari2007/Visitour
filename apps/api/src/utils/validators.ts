@@ -22,6 +22,10 @@ export const CreateItinerarySchema = z.object({
 
 export const UpdateItinerarySchema = CreateItinerarySchema.partial();
 
+export const UpdateItineraryPublicSchema = z.object({
+  isPublic: z.boolean(),
+}).strict();
+
 export const CreateEntrySchema = z.object({
   dayNumber: z.number().int().positive(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)'),
