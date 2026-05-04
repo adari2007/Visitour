@@ -93,13 +93,20 @@ export function ItineraryDetailPage() {
     return entry;
   });
 
-  // Use transformed entries for display when in public hideDetails mode
-  const displayEntries = isPublicView && hideDetails ? transformedEntries : entries;
-  const isOwner = Boolean(user?.id && itinerary?.ownerId && user.id === itinerary.ownerId);
-  const isReadOnlyPublicView = Boolean(itinerary?.isPublic && !isOwner);
-  const canManageEntries = !isReadOnlyPublicView;
-  const canEditTrip = !isReadOnlyPublicView;
-  const canManageShares = !isReadOnlyPublicView;
+   // Use transformed entries for display when in public hideDetails mode
+   const displayEntries = isPublicView && hideDetails ? transformedEntries : entries;
+   const isOwner = Boolean(user?.id && itinerary?.ownerId && user.id === itinerary.ownerId);
+   const isReadOnlyPublicView = Boolean(itinerary?.isPublic && !isOwner);
+
+   // Check if user has view-only (not edit) access to a shared itinerary
+   const userShareAccess = shares.length > 0
+     ? shares.find((s: any) => s.email === user?.email)?.access
+     : undefined;
+   const hasViewOnlyAccess = Boolean(!isOwner && userShareAccess === 'view');
+
+   const canManageEntries = !isReadOnlyPublicView && !hasViewOnlyAccess;
+   const canEditTrip = !isReadOnlyPublicView && !hasViewOnlyAccess;
+   const canManageShares = !isReadOnlyPublicView; // Only owner can manage shares
 
   const flyingDates = new Set(
     displayEntries
@@ -183,12 +190,11 @@ export function ItineraryDetailPage() {
     }
   }, [dispatch, id, token, navigate]);
 
-  useEffect(() => {
-    if (!token || !id || !itinerary) return;
-    if (canManageShares) {
-      dispatch(fetchShares(id));
-    }
-  }, [dispatch, id, token, itinerary, canManageShares]);
+   useEffect(() => {
+     if (!token || !id || !itinerary) return;
+     // Always fetch shares to check user's access level for shared itineraries
+     dispatch(fetchShares(id));
+   }, [dispatch, id, token, itinerary]);
 
   const buildFormattedText = () => {
     const lines: string[] = [];

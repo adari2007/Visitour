@@ -182,9 +182,12 @@ export function EntriesList({
     [startDate]
   );
 
-  const openComposer = (type: Exclude<ComposerType, null>, dayNumber: number, date: string) => {
-    if (!canManageEntries) return;
-    setComposer({ mode: 'create', type, dayNumber, date });
+   const openComposer = (type: Exclude<ComposerType, null>, dayNumber: number, date: string) => {
+     if (!canManageEntries) {
+       window.alert('You do not have permission to add entries to this itinerary. Only users with edit access can add entries.');
+       return;
+     }
+     setComposer({ mode: 'create', type, dayNumber, date });
 
      if (type === 'flight') {
        setFlightForm({
@@ -236,9 +239,12 @@ export function EntriesList({
     }
   };
 
-  const openComposerForEdit = (entry: Entry) => {
-    if (!canManageEntries) return;
-    const details = entry.customDetails || {};
+   const openComposerForEdit = (entry: Entry) => {
+     if (!canManageEntries) {
+       window.alert('You do not have permission to edit entries in this itinerary. Only users with edit access can edit entries.');
+       return;
+     }
+     const details = entry.customDetails || {};
     const type = (details.type as ComposerType) ||
       (entry.category === 'transport'
         ? 'flight'
@@ -864,23 +870,29 @@ export function EntriesList({
     }));
   };
 
-  const handleAddEntryFromHeader = (dayNumber: number, date: string) => {
-    if (!canManageEntries) return;
-    setHeaderAddPicker((prev) =>
-      prev?.dayNumber === dayNumber ? null : { dayNumber, date }
-    );
-  };
+   const handleAddEntryFromHeader = (dayNumber: number, date: string) => {
+     if (!canManageEntries) {
+       window.alert('You do not have permission to add entries to this itinerary. Only users with edit access can add entries.');
+       return;
+     }
+     setHeaderAddPicker((prev) =>
+       prev?.dayNumber === dayNumber ? null : { dayNumber, date }
+     );
+   };
 
-  const handleAddEntryTypeFromHeader = (
-    dayNumber: number,
-    date: string,
-    type: Exclude<ComposerType, null>
-  ) => {
-    if (!canManageEntries) return;
-    setHeaderAddPicker(null);
-    setExpandedDays((prev) => ({ ...prev, [dayNumber]: true }));
-    openComposer(type, dayNumber, date);
-  };
+   const handleAddEntryTypeFromHeader = (
+     dayNumber: number,
+     date: string,
+     type: Exclude<ComposerType, null>
+   ) => {
+     if (!canManageEntries) {
+       window.alert('You do not have permission to add entries to this itinerary. Only users with edit access can add entries.');
+       return;
+     }
+     setHeaderAddPicker(null);
+     setExpandedDays((prev) => ({ ...prev, [dayNumber]: true }));
+     openComposer(type, dayNumber, date);
+   };
 
   const toggleEntryDetails = (entryId: string) => {
     setExpandedEntryDetails((prev) => ({
