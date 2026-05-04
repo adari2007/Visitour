@@ -2,6 +2,13 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 
+const allowedHosts = [
+  'localhost',
+  '127.0.0.1',
+  '.up.railway.app',
+  ...(process.env.RAILWAY_PUBLIC_DOMAIN ? [process.env.RAILWAY_PUBLIC_DOMAIN] : []),
+];
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -17,6 +24,10 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
+    allowedHosts,
+  },
+  preview: {
+    allowedHosts,
   },
   build: {
     outDir: 'dist',
