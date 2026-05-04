@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "yarn dev:web",
+    "start": "yarn workspace @visitour/web start",
     "dev:web": "yarn workspace @visitour/web dev",
     "dev:mobile": "yarn workspace @visitour/mobile start",
     "build": "yarn build:web && yarn build:mobile",
