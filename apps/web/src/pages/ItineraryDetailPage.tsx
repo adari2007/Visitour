@@ -794,98 +794,116 @@ export function ItineraryDetailPage() {
                     Hectic Days - {hecticDaysCount} {hecticDaysCount === 1 ? 'day' : 'days'}
                   </p>
                 </div>
-                <div id="share-export" className="p-3 rounded-xl bg-violet-50 border border-violet-100 space-y-3">
-                  <p className="text-violet-700 font-semibold">Share & Export</p>
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    {itinerary.isPublic ? (
+                {isOwner ? (
+                  <div id="share-export" className="p-3 rounded-xl bg-violet-50 border border-violet-100 space-y-3">
+                    <p className="text-violet-700 font-semibold">Share & Export</p>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      {itinerary.isPublic ? (
+                        <button
+                          type="button"
+                          onClick={handleCopyPublicUrl}
+                          className="px-3 py-1.5 text-xs font-semibold rounded bg-emerald-600 text-white hover:bg-emerald-700 w-full sm:w-auto"
+                        >
+                          Copy Public URL
+                        </button>
+                      ) : null}
                       <button
                         type="button"
-                        onClick={handleCopyPublicUrl}
-                        className="px-3 py-1.5 text-xs font-semibold rounded bg-emerald-600 text-white hover:bg-emerald-700 w-full sm:w-auto"
+                        onClick={handleCopyFormattedText}
+                        className="px-3 py-1.5 text-xs font-semibold rounded bg-violet-600 text-white hover:bg-violet-700 w-full sm:w-auto"
                       >
-                        Copy Public URL
+                        Copy Formatted Text
                       </button>
-                    ) : null}
+                      <button
+                        type="button"
+                        onClick={handleExportPdf}
+                        className="px-3 py-1.5 text-xs font-semibold rounded bg-cyan-600 text-white hover:bg-cyan-700 w-full sm:w-auto"
+                      >
+                        Export PDF
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleGrantShare} className="space-y-2">
+                      <input
+                        type="email"
+                        placeholder="user@example.com"
+                        value={shareEmail}
+                        onChange={(e) => setShareEmail(e.target.value)}
+                        className="w-full px-3 py-2 rounded border border-violet-200"
+                        required
+                      />
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <select
+                          value={shareAccess}
+                          onChange={(e) => setShareAccess(e.target.value as 'view' | 'edit')}
+                          className="flex-1 px-3 py-2 rounded border border-violet-200"
+                        >
+                          <option value="view">View access</option>
+                          <option value="edit">Edit access</option>
+                        </select>
+                        <button
+                          type="submit"
+                          className="px-3 py-2 text-xs font-semibold rounded bg-emerald-600 text-white hover:bg-emerald-700 w-full sm:w-auto"
+                        >
+                          Grant Access
+                        </button>
+                      </div>
+                    </form>
+
+                    <div className="space-y-2 max-h-48 overflow-auto pr-1">
+                      {shares.length === 0 ? (
+                        <p className="text-xs text-violet-600">No shared users yet.</p>
+                      ) : (
+                        shares.map((share: any) => (
+                          <div key={share.id} className="p-2 rounded border border-violet-200 bg-white space-y-2">
+                            <p className="text-xs font-medium text-gray-700 break-all">{share.email}</p>
+                            <div className="flex flex-col sm:flex-row gap-2">
+                              <select
+                                value={share.access}
+                                onChange={(e) =>
+                                  handleShareAccessChange(share.id, e.target.value as 'view' | 'edit')
+                                }
+                                className="flex-1 px-2 py-1 text-xs rounded border border-violet-200"
+                              >
+                                <option value="view">View</option>
+                                <option value="edit">Edit</option>
+                              </select>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveShare(share.id)}
+                                className="px-2 py-1 text-xs rounded bg-rose-600 text-white hover:bg-rose-700"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                ) : hasViewOnlyAccess && itinerary.isPublic ? (
+                  <div id="share-export" className="p-3 rounded-xl bg-violet-50 border border-violet-100 space-y-3">
+                    <p className="text-violet-700 font-semibold">Share</p>
                     <button
                       type="button"
-                      onClick={handleCopyFormattedText}
-                      className="px-3 py-1.5 text-xs font-semibold rounded bg-violet-600 text-white hover:bg-violet-700 w-full sm:w-auto"
+                      onClick={handleCopyPublicUrl}
+                      className="w-full px-3 py-1.5 text-xs font-semibold rounded bg-emerald-600 text-white hover:bg-emerald-700"
                     >
-                      Copy Formatted Text
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleExportPdf}
-                      className="px-3 py-1.5 text-xs font-semibold rounded bg-cyan-600 text-white hover:bg-cyan-700 w-full sm:w-auto"
-                    >
-                      Export PDF
+                      Copy Public URL
                     </button>
                   </div>
-
-                  {canManageShares ? (
-                    <>
-                      <form onSubmit={handleGrantShare} className="space-y-2">
-                        <input
-                          type="email"
-                          placeholder="user@example.com"
-                          value={shareEmail}
-                          onChange={(e) => setShareEmail(e.target.value)}
-                          className="w-full px-3 py-2 rounded border border-violet-200"
-                          required
-                        />
-                        <div className="flex flex-col sm:flex-row gap-2">
-                          <select
-                            value={shareAccess}
-                            onChange={(e) => setShareAccess(e.target.value as 'view' | 'edit')}
-                            className="flex-1 px-3 py-2 rounded border border-violet-200"
-                          >
-                            <option value="view">View access</option>
-                            <option value="edit">Edit access</option>
-                          </select>
-                          <button
-                            type="submit"
-                            className="px-3 py-2 text-xs font-semibold rounded bg-emerald-600 text-white hover:bg-emerald-700 w-full sm:w-auto"
-                          >
-                            Grant Access
-                          </button>
-                        </div>
-                      </form>
-
-                      <div className="space-y-2 max-h-48 overflow-auto pr-1">
-                        {shares.length === 0 ? (
-                          <p className="text-xs text-violet-600">No shared users yet.</p>
-                        ) : (
-                          shares.map((share: any) => (
-                            <div key={share.id} className="p-2 rounded border border-violet-200 bg-white space-y-2">
-                              <p className="text-xs font-medium text-gray-700 break-all">{share.email}</p>
-                              <div className="flex flex-col sm:flex-row gap-2">
-                                <select
-                                  value={share.access}
-                                  onChange={(e) =>
-                                    handleShareAccessChange(share.id, e.target.value as 'view' | 'edit')
-                                  }
-                                  className="flex-1 px-2 py-1 text-xs rounded border border-violet-200"
-                                >
-                                  <option value="view">View</option>
-                                  <option value="edit">Edit</option>
-                                </select>
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveShare(share.id)}
-                                  className="px-2 py-1 text-xs rounded bg-rose-600 text-white hover:bg-rose-700"
-                                >
-                                  Remove
-                                </button>
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </>
-                  ) : (
-                    <p className="text-xs text-violet-600">Only the itinerary owner can grant or manage access.</p>
-                  )}
-                </div>
+                ) : isReadOnlyPublicView && itinerary.isPublic ? (
+                  <div id="share-export" className="p-3 rounded-xl bg-violet-50 border border-violet-100 space-y-3">
+                    <p className="text-violet-700 font-semibold">Share</p>
+                    <button
+                      type="button"
+                      onClick={handleCopyPublicUrl}
+                      className="w-full px-3 py-1.5 text-xs font-semibold rounded bg-emerald-600 text-white hover:bg-emerald-700"
+                    >
+                      Copy Public URL
+                    </button>
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>
