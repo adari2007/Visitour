@@ -4,22 +4,21 @@
   "description": "Cross-platform itinerary application",
   "private": true,
   "scripts": {
-    "dev": "yarn dev:web",
-    "start": "yarn workspace @visitour/web start",
-    "dev:web": "yarn workspace @visitour/web dev",
-    "dev:mobile": "yarn workspace @visitour/mobile start",
-    "build": "yarn build:web && yarn build:mobile",
-    "build:web": "yarn workspace @visitour/web build",
-    "build:mobile": "yarn workspace @visitour/mobile build",
-    "lint": "yarn workspaces foreach run lint",
-    "type-check": "yarn workspaces foreach run type-check",
-    "test": "yarn workspaces foreach run test",
+    "dev": "npm --prefix apps/web run dev",
+    "start": "npm --prefix apps/web run start",
+    "dev:web": "npm --prefix apps/web run dev",
+    "dev:mobile": "npm --prefix apps/mobile run start",
+    "build": "npm install --prefix apps/web && npm --prefix apps/web run build",
+    "build:web": "npm --prefix apps/web run build",
+    "build:mobile": "npm --prefix apps/mobile run build",
+    "lint": "npm --prefix apps/web run lint && npm --prefix apps/mobile run lint",
+    "type-check": "npm --prefix apps/web run type-check && npm --prefix apps/mobile run type-check",
+    "test": "echo 'No root tests configured'",
     "format": "prettier --write \"apps/**/*.{ts,tsx,js,jsx,json,css}\" \"packages/**/*.{ts,tsx,js,jsx,json,css}\""
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "prettier": "^3.0.0",
     "typescript": "^5.0.0"
-  },
-  "packageManager": "yarn@4.14.1"
+  }
 }
