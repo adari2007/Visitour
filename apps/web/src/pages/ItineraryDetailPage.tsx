@@ -40,6 +40,8 @@ export function ItineraryDetailPage() {
   const [shareEmail, setShareEmail] = useState('');
   const [shareAccess, setShareAccess] = useState<'view' | 'edit'>('view');
   const [hideDetails, setHideDetails] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  const [highlightedDates, setHighlightedDates] = useState<Set<string> | null>(null);
   const [tripForm, setTripForm] = useState({
     title: '',
     description: '',
@@ -178,6 +180,39 @@ export function ItineraryDetailPage() {
       .map((e: any) => e.date)
   );
   const noStayDaysCount = allTripDates.filter((date) => !stayDates.has(date)).length;
+
+  // Date sets for filter highlighting
+  const flyingDatesSet = flyingDates;
+  const cozyDatesSet = new Set(allTripDates.filter((d) => !activityOrJourneyDates.has(d)));
+  const noStayDatesSet = new Set(allTripDates.filter((d) => !stayDates.has(d)));
+  const restDatesSet = new Set(allTripDates.filter((d) => !flyingDates.has(d) && !activityDates.has(d)));
+  const hecticDatesSet = new Set(
+    allTripDates.filter((date) => {
+      const hasFlightAndEvents =
+        (flightCountByDate[date] || 0) > 0 && (totalEventCountByDate[date] || 0) >= 2;
+      const hasManyActivities = (activityCountByDate[date] || 0) > 4;
+      return hasFlightAndEvents || hasManyActivities;
+    })
+  );
+
+  const handleStatClick = (filterKey: string, dates: Set<string>) => {
+    if (activeFilter === filterKey) {
+      setActiveFilter(null);
+      setHighlightedDates(null);
+    } else {
+      setActiveFilter(filterKey);
+      setHighlightedDates(dates);
+      const firstDate = allTripDates.find((d) => dates.has(d));
+      if (firstDate) {
+        setTimeout(() => {
+          document.getElementById(`day-${firstDate}`)?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center',
+          });
+        }, 80);
+      }
+    }
+  };
 
   const toInputDate = (dateValue: string) => dateValue?.split('T')[0] || '';
 
@@ -766,6 +801,7 @@ export function ItineraryDetailPage() {
             onDelete={handleDeleteEntry}
             onDeleteEntryById={handleDeleteEntryById}
             isLoading={loading || isCreatingEntries}
+            highlightedDates={highlightedDates ?? undefined}
           />
         </div>
 
@@ -785,62 +821,97 @@ export function ItineraryDetailPage() {
                 <p className="text-violet-200 text-xs">days</p>
               </div>
 
-              {/* Stat rows */}
+              {/* Stat rows — clickable filters */}
               {[
                 {
+                  key: 'flying',
                   icon: '✈️',
                   label: `Flying — ${flyingDaysCount} ${flyingDaysCount === 1 ? 'day' : 'days'}`,
                   sub: `${totalFlightsCount} flight${totalFlightsCount !== 1 ? 's' : ''}`,
                   bg: 'bg-sky-50',
                   border: 'border-sky-100',
                   textColor: 'text-sky-700',
+                  activeBg: 'bg-sky-500',
+                  dates: flyingDatesSet,
                 },
                 {
+                  key: 'cozy',
                   icon: '🛋️',
                   label: `Cozy days — ${cozyDaysCount}`,
                   sub: 'No activities or travel',
                   bg: 'bg-rose-50',
                   border: 'border-rose-100',
                   textColor: 'text-rose-700',
+                  activeBg: 'bg-rose-500',
+                  dates: cozyDatesSet,
                 },
                 {
+                  key: 'nostay',
                   icon: '🌙',
                   label: `No stay — ${noStayDaysCount} ${noStayDaysCount === 1 ? 'day' : 'days'}`,
                   sub: 'Overnight travel days',
                   bg: 'bg-amber-50',
                   border: 'border-amber-100',
                   textColor: 'text-amber-700',
+                  activeBg: 'bg-amber-500',
+                  dates: noStayDatesSet,
                 },
                 {
+                  key: 'rest',
                   icon: '😴',
                   label: `Rest days — ${restDaysCount}`,
                   sub: 'No flights or activities',
                   bg: 'bg-lime-50',
                   border: 'border-lime-100',
                   textColor: 'text-lime-700',
+                  activeBg: 'bg-lime-500',
+                  dates: restDatesSet,
                 },
                 {
+                  key: 'hectic',
                   icon: '⚡',
                   label: `Hectic days — ${hecticDaysCount}`,
                   sub: 'Flights + multiple events',
                   bg: 'bg-orange-50',
                   border: 'border-orange-100',
                   textColor: 'text-orange-700',
+                  activeBg: 'bg-orange-500',
+                  dates: hecticDatesSet,
                 },
-              ].map((stat) => (
-                <div
-                  key={stat.label}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl ${stat.bg} border ${stat.border}`}
-                >
-                  <span className="text-base shrink-0">{stat.icon}</span>
-                  <div className="min-w-0">
-                    <p className={`text-xs font-semibold ${stat.textColor} leading-tight`}>
-                      {stat.label}
-                    </p>
-                    <p className="text-[10px] text-slate-400 leading-tight mt-0.5">{stat.sub}</p>
-                  </div>
-                </div>
-              ))}
+              ].map((stat) => {
+                const isActive = activeFilter === stat.key;
+                const hasMatches = stat.dates.size > 0;
+                return (
+                  <button
+                    key={stat.key}
+                    type="button"
+                    onClick={() => hasMatches && handleStatClick(stat.key, stat.dates)}
+                    disabled={!hasMatches}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-all duration-200 ${
+                      isActive
+                        ? `${stat.activeBg} border-transparent shadow-md`
+                        : `${stat.bg} ${stat.border} ${hasMatches ? 'hover:brightness-95 hover:shadow-sm cursor-pointer' : 'opacity-60 cursor-default'}`
+                    }`}
+                  >
+                    <span className="text-base shrink-0">{stat.icon}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className={`text-xs font-semibold leading-tight ${isActive ? 'text-white' : stat.textColor}`}>
+                        {stat.label}
+                      </p>
+                      <p className={`text-[10px] leading-tight mt-0.5 ${isActive ? 'text-white/80' : 'text-slate-400'}`}>
+                        {stat.sub}
+                      </p>
+                    </div>
+                    {hasMatches && (
+                      <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                        isActive ? 'bg-white/20 text-white' : 'bg-white/80 ' + stat.textColor
+                      }`}>
+                        {isActive ? '✕' : '▼'}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
 
               {/* Share & Export */}
               {isOwner ? (

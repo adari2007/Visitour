@@ -24,6 +24,7 @@ interface EntriesListProps {
   onDelete: (entry: Entry) => void;
   onDeleteEntryById?: (id: string) => Promise<void>;
   isLoading?: boolean;
+  highlightedDates?: Set<string>;
 }
 
 type ComposerType = 'flight' | 'hotel' | 'activity' | null;
@@ -62,6 +63,7 @@ export function EntriesList({
   onDelete,
   onDeleteEntryById,
   isLoading = false,
+  highlightedDates,
 }: EntriesListProps) {
   const [expandedDays, setExpandedDays] = React.useState<Record<number, boolean>>({});
   const [expandedEntryDetails, setExpandedEntryDetails] = React.useState<Record<string, boolean>>({});
@@ -777,6 +779,21 @@ export function EntriesList({
     });
   }, [allDates]);
 
+  // Auto-expand highlighted days when a filter is applied
+  React.useEffect(() => {
+    if (!highlightedDates || highlightedDates.size === 0) return;
+    setExpandedDays((prev) => {
+      const next = { ...prev };
+      allDates.forEach((dateObj, index) => {
+        const key = format(dateObj, 'yyyy-MM-dd');
+        if (highlightedDates.has(key)) {
+          next[index + 1] = true;
+        }
+      });
+      return next;
+    });
+  }, [highlightedDates, allDates]);
+
   const toggleDay = (dayNumber: number) => {
     setHeaderAddPicker(null);
     setExpandedDays((prev) => ({ ...prev, [dayNumber]: !prev[dayNumber] }));
@@ -919,6 +936,12 @@ export function EntriesList({
   // ─── JSX ───────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
+      {highlightedDates && (
+        <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-violet-50 border border-violet-200 text-violet-700 text-xs font-semibold">
+          <span>🔍</span>
+          <span>Showing {highlightedDates.size} matching day{highlightedDates.size !== 1 ? 's' : ''}. Click the stat again to clear.</span>
+        </div>
+      )}
       {allDates.length === 0 ? (
         <p className="text-slate-500 text-center py-12">No trip days found. Please check trip dates.</p>
       ) : (
@@ -938,11 +961,20 @@ export function EntriesList({
                     .map((e) => summarizeEntryForDayHeader(e))
                     .join(' • ')} • +${dayEntries.length - 2} more`;
 
+          const isHighlighted = highlightedDates ? highlightedDates.has(dateKey) : null;
+
           return (
             <div
               key={dateKey}
-              className={`relative bg-white border border-slate-100 rounded-2xl overflow-visible shadow-card ${
+              id={`day-${dateKey}`}
+              className={`relative bg-white border rounded-2xl overflow-visible shadow-card transition-all duration-300 ${
                 isPickerOpen ? 'z-50' : 'z-0'
+              } ${
+                highlightedDates
+                  ? isHighlighted
+                    ? 'border-violet-400 ring-2 ring-violet-300/60 ring-offset-1 shadow-violet-100'
+                    : 'border-slate-100 opacity-35'
+                  : 'border-slate-100'
               }`}
             >
               {/* Day header */}
