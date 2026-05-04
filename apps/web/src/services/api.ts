@@ -1,12 +1,11 @@
 import axios from 'axios';
 
 const configuredApiUrl = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
+const API_BASE_URL = (configuredApiUrl || '/api').replace(/\/+$/, '');
 
-if (!configuredApiUrl) {
-  throw new Error('VITE_API_URL is required. Point it to VisitourAPI, e.g. http://localhost:3000/api');
+if (!configuredApiUrl && typeof window !== 'undefined') {
+  console.warn('VITE_API_URL is not set. Falling back to /api.');
 }
-
-const API_BASE_URL = configuredApiUrl.replace(/\/+$/, '');
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
