@@ -1,7 +1,15 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
+const configuredApiUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
+
+if (!configuredApiUrl) {
+  throw new Error(
+    'EXPO_PUBLIC_API_URL is required. Point it to VisitourAPI, e.g. http://localhost:3000/api'
+  );
+}
+
+const API_BASE_URL = configuredApiUrl.replace(/\/+$/, '');
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
