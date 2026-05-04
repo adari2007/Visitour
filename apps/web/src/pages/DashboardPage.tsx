@@ -46,10 +46,7 @@ export function DashboardPage() {
   const handleCreateItinerary = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await dispatch(createItinerary({
-        ...newItinerary,
-        isPublic: false,
-      })).unwrap();
+      await dispatch(createItinerary({ ...newItinerary, isPublic: false })).unwrap();
       setNewItinerary({ title: '', description: '', startDate: '', endDate: '' });
       setShowForm(false);
     } catch (err) {
@@ -68,12 +65,10 @@ export function DashboardPage() {
       )}`
     );
     lines.push('');
-
     const sortedEntries = [...entries].sort((a: any, b: any) => {
       if (a.date === b.date) return (a.timeStart || '').localeCompare(b.timeStart || '');
       return a.date.localeCompare(b.date);
     });
-
     let currentDate = '';
     sortedEntries.forEach((entry: any) => {
       if (entry.date !== currentDate) {
@@ -86,7 +81,6 @@ export function DashboardPage() {
       if (entry.location) lines.push(`  Location: ${entry.location}`);
       if (entry.description) lines.push(`  Notes: ${entry.description}`);
     });
-
     return lines.join('\n');
   };
 
@@ -126,7 +120,6 @@ export function DashboardPage() {
         window.alert('Unable to open print window. Please allow popups.');
         return;
       }
-
       printWindow.document.write(`
         <html>
           <head>
@@ -160,13 +153,9 @@ export function DashboardPage() {
       window.alert('Please enter an email address.');
       return;
     }
-
     setActionLoading(true);
     try {
-      await sharesAPI.create(itineraryId, {
-        email: shareEmail.trim(),
-        access: shareAccess,
-      });
+      await sharesAPI.create(itineraryId, { email: shareEmail.trim(), access: shareAccess });
       setShareEmail('');
       setShareAccess('view');
       window.alert('Access granted successfully.');
@@ -197,250 +186,349 @@ export function DashboardPage() {
   };
 
   if (!user) {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex items-center justify-center py-24">
+        <div className="flex flex-col items-center gap-3 text-slate-500">
+          <div className="w-10 h-10 border-3 border-violet-300 border-t-violet-600 rounded-full animate-spin" />
+          <p className="text-sm font-medium">Loading your trips…</p>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-12">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6 sm:mb-8">
-        <h1 className="text-3xl sm:text-4xl font-bold text-gray-900">My Itineraries</h1>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 w-full sm:w-auto"
-        >
-          {showForm ? 'Cancel' : '+ New Itinerary'}
-        </button>
+    <div className="min-h-screen bg-slate-50">
+      {/* Page header */}
+      <div className="bg-white border-b border-slate-100 shadow-sm">
+        <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 mb-1">
+                My Itineraries
+              </h1>
+              <p className="text-slate-500 text-sm">
+                {ownedItineraries.length === 0
+                  ? 'Create your first trip to get started'
+                  : `${ownedItineraries.length} trip${ownedItineraries.length !== 1 ? 's' : ''} planned`}
+              </p>
+            </div>
+            <button
+              onClick={() => setShowForm(!showForm)}
+              className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all w-full sm:w-auto ${
+                showForm
+                  ? 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  : 'btn-primary'
+              }`}
+            >
+              {showForm ? '✕ Cancel' : '＋ New Trip'}
+            </button>
+          </div>
+        </div>
       </div>
 
-      {showForm && (
-        <div className="bg-white p-4 sm:p-6 rounded-lg shadow mb-8">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Create New Itinerary</h2>
-          <form onSubmit={handleCreateItinerary} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
-              <input
-                type="text"
-                value={newItinerary.title}
-                onChange={(e) => setNewItinerary((prev) => ({ ...prev, title: e.target.value }))}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                placeholder="e.g., Paris Trip 2024"
-              />
+      <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-10">
+        {/* Create form */}
+        {showForm && (
+          <div className="mb-8 bg-white rounded-2xl shadow-card border border-violet-100 overflow-hidden animate-fade-in">
+            <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-violet-50 to-fuchsia-50">
+              <h2 className="text-lg font-bold text-slate-900">Plan a New Trip</h2>
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-              <textarea
-                value={newItinerary.description}
-                onChange={(e) => setNewItinerary((prev) => ({ ...prev, description: e.target.value }))}
-                rows={3}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                placeholder="Describe your trip"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <form onSubmit={handleCreateItinerary} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                <label className="form-label">Trip Title</label>
                 <input
-                  type="date"
-                  value={newItinerary.startDate}
-                  onChange={(e) => setNewItinerary((prev) => ({ ...prev, startDate: e.target.value }))}
+                  type="text"
+                  value={newItinerary.title}
+                  onChange={(e) => setNewItinerary((p) => ({ ...p, title: e.target.value }))}
                   required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                  className="input-field"
+                  placeholder="e.g., Paris Spring 2025"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
-                <input
-                  type="date"
-                  value={newItinerary.endDate}
-                  onChange={(e) => setNewItinerary((prev) => ({ ...prev, endDate: e.target.value }))}
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                <label className="form-label">Description <span className="font-normal text-slate-400">(optional)</span></label>
+                <textarea
+                  value={newItinerary.description}
+                  onChange={(e) => setNewItinerary((p) => ({ ...p, description: e.target.value }))}
+                  rows={2}
+                  className="input-field resize-none"
+                  placeholder="A quick summary of your trip"
                 />
               </div>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-            >
-              Create Itinerary
-            </button>
-          </form>
-        </div>
-      )}
-
-      {loading ? (
-        <div className="text-center py-12">Loading itineraries...</div>
-      ) : (
-        <div className="space-y-10">
-          <section>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">My Itineraries</h2>
-            {ownedItineraries.length === 0 ? (
-                <div className="bg-white p-6 sm:p-8 rounded-lg shadow text-center">
-                  <p className="text-gray-500 text-base sm:text-lg">No itineraries yet. Create your first one!</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="form-label">Start Date</label>
+                  <input
+                    type="date"
+                    value={newItinerary.startDate}
+                    onChange={(e) => setNewItinerary((p) => ({ ...p, startDate: e.target.value }))}
+                    required
+                    className="input-field"
+                  />
+                </div>
+                <div>
+                  <label className="form-label">End Date</label>
+                  <input
+                    type="date"
+                    value={newItinerary.endDate}
+                    onChange={(e) => setNewItinerary((p) => ({ ...p, endDate: e.target.value }))}
+                    required
+                    className="input-field"
+                  />
+                </div>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {ownedItineraries.map((itinerary) => (
-                  <div
-                    key={itinerary.id}
-                    className="relative bg-white p-6 rounded-lg shadow hover:shadow-lg transition"
+              <div className="flex flex-col sm:flex-row gap-3 pt-1">
+                <button
+                  type="submit"
+                  className="btn-primary flex-1 sm:flex-none py-3"
+                >
+                  Create Trip
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowForm(false)}
+                  className="flex-1 sm:flex-none px-5 py-3 rounded-xl font-semibold text-sm bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="flex flex-col items-center gap-3 text-slate-400">
+              <div className="w-8 h-8 border-2 border-violet-200 border-t-violet-500 rounded-full animate-spin" />
+              <p className="text-sm">Loading trips…</p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-10">
+            {/* Owned itineraries */}
+            <section>
+              <h2 className="text-base font-bold text-slate-500 uppercase tracking-wider mb-5">
+                Your Trips
+              </h2>
+
+              {ownedItineraries.length === 0 ? (
+                <div className="bg-white rounded-2xl border-2 border-dashed border-slate-200 p-12 text-center">
+                  <div className="w-14 h-14 rounded-2xl bg-violet-100 flex items-center justify-center text-3xl mx-auto mb-4">
+                    🗺️
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-700 mb-2">No trips yet</h3>
+                  <p className="text-slate-500 text-sm mb-5">
+                    Create your first itinerary to start planning your adventure.
+                  </p>
+                  <button
+                    onClick={() => setShowForm(true)}
+                    className="btn-primary px-6 py-2.5 text-sm"
                   >
-                    <h3 className="text-xl font-bold text-gray-900 mb-2">{itinerary.title}</h3>
-                    {itinerary.description && <p className="text-gray-600 mb-3 line-clamp-2">{itinerary.description}</p>}
-                    <div className="text-sm text-gray-500 space-y-1">
-                      <p>📅 {format(parseISO(itinerary.startDate), 'MMM dd, yyyy')}</p>
-                      <p>📍 to {format(parseISO(itinerary.endDate), 'MMM dd, yyyy')}</p>
-                    </div>
-                    <div className="mt-4 flex items-center justify-between gap-3">
-                      <Link
-                        to={`/itinerary/${itinerary.id}`}
-                        className="text-sm font-semibold text-blue-600 hover:text-blue-700"
-                      >
-                        Open Itinerary
-                      </Link>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setActiveShareItineraryId((prev) =>
-                            prev === itinerary.id ? null : itinerary.id
-                          )
-                        }
-                        className="inline-flex items-center gap-1.5 text-sm font-semibold text-violet-600 hover:text-violet-700"
-                      >
-                        <span aria-hidden="true">🔗</span>
-                        Share & Export
-                      </button>
-                    </div>
+                    ＋ New Trip
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {ownedItineraries.map((itinerary) => (
+                    <div
+                      key={itinerary.id}
+                      className="relative bg-white rounded-2xl border border-slate-100 shadow-card hover:shadow-card-hover hover:-translate-y-0.5 transition-all duration-200 overflow-visible"
+                    >
+                      {/* Top accent bar */}
+                      <div className="h-1 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-500 rounded-t-2xl" />
 
-                    {activeShareItineraryId === itinerary.id ? (
-                      <div className="absolute right-4 top-[calc(100%-0.25rem)] z-20 w-[min(22rem,calc(100vw-3rem))] rounded-xl border border-violet-200 bg-white p-3 shadow-2xl space-y-3">
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm font-semibold text-violet-700">Share & Export</p>
-                          <button
-                            type="button"
-                            onClick={() => setActiveShareItineraryId(null)}
-                            className="text-xs font-semibold text-gray-500 hover:text-gray-700"
-                          >
-                            Close
-                          </button>
+                      <div className="p-5">
+                        {/* Public badge */}
+                        {itinerary.isPublic && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold mb-3">
+                            🌐 Public
+                          </span>
+                        )}
+
+                        <h3 className="text-lg font-bold text-slate-900 mb-1.5 leading-snug">
+                          {itinerary.title}
+                        </h3>
+                        {itinerary.description && (
+                          <p className="text-slate-500 text-sm mb-3 line-clamp-2 leading-relaxed">
+                            {itinerary.description}
+                          </p>
+                        )}
+
+                        <div className="flex flex-col gap-1 text-xs text-slate-500 mb-4">
+                          <span className="flex items-center gap-1.5">
+                            <span className="text-violet-400">📅</span>
+                            {format(parseISO(itinerary.startDate), 'MMM dd, yyyy')}
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <span className="text-fuchsia-400">🏁</span>
+                            {format(parseISO(itinerary.endDate), 'MMM dd, yyyy')}
+                          </span>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                          <Link
+                            to={`/itinerary/${itinerary.id}`}
+                            className="text-sm font-bold text-violet-600 hover:text-violet-700 transition-colors"
+                          >
+                            Open Trip →
+                          </Link>
                           <button
                             type="button"
-                            disabled={actionLoading}
-                            onClick={() => handleCopyTripLink(itinerary.id)}
-                            className="px-3 py-2 text-xs font-semibold rounded bg-violet-600 text-white hover:bg-violet-700 disabled:bg-gray-400"
+                            onClick={() =>
+                              setActiveShareItineraryId((prev) =>
+                                prev === itinerary.id ? null : itinerary.id
+                              )
+                            }
+                            className="inline-flex items-center gap-1.5 text-sm font-semibold text-fuchsia-600 hover:text-fuchsia-700 transition-colors"
                           >
-                            Copy Trip Link
+                            <span>🔗</span> Share
                           </button>
-                          <button
-                            type="button"
-                            disabled={actionLoading}
-                            onClick={() => handleCopyFormattedText(itinerary)}
-                            className="px-3 py-2 text-xs font-semibold rounded bg-cyan-600 text-white hover:bg-cyan-700 disabled:bg-gray-400"
-                          >
-                            Copy Formatted Text
-                          </button>
-                          <button
-                            type="button"
-                            disabled={actionLoading}
-                            onClick={() => handleExportPdf(itinerary)}
-                            className="px-3 py-2 text-xs font-semibold rounded bg-emerald-600 text-white hover:bg-emerald-700 disabled:bg-gray-400 sm:col-span-2"
-                          >
-                            Export PDF
-                          </button>
-                        </div>
-
-                        <form onSubmit={(e) => handleGrantShare(itinerary.id, e)} className="space-y-2 border-t border-violet-100 pt-3">
-                          <input
-                            type="email"
-                            placeholder="user@example.com"
-                            value={shareEmail}
-                            onChange={(e) => setShareEmail(e.target.value)}
-                            className="w-full px-3 py-2 rounded border border-violet-200 text-sm"
-                            required
-                          />
-                          <div className="flex flex-col sm:flex-row gap-2">
-                            <select
-                              value={shareAccess}
-                              onChange={(e) => setShareAccess(e.target.value as 'view' | 'edit')}
-                              className="flex-1 px-3 py-2 rounded border border-violet-200 text-sm"
-                            >
-                              <option value="view">View access</option>
-                              <option value="edit">Edit access</option>
-                            </select>
-                            <button
-                              type="submit"
-                              disabled={actionLoading}
-                              className="px-3 py-2 text-xs font-semibold rounded bg-amber-600 text-white hover:bg-amber-700 disabled:bg-gray-400"
-                            >
-                              Grant Access
-                            </button>
-                          </div>
-                        </form>
-
-                        <div className="border-t border-violet-100 pt-3">
-                          <p className="text-sm font-semibold text-violet-700 mb-2">Public Access</p>
-                          <button
-                            onClick={() => handleTogglePublic(itinerary)}
-                            disabled={actionLoading}
-                            className="w-full px-3 py-2 text-xs font-semibold rounded bg-purple-600 text-white hover:bg-purple-700 disabled:bg-gray-400"
-                          >
-                            {itinerary.isPublic ? 'Make Private' : 'Make Public'}
-                          </button>
-                          {itinerary.isPublic && (
-                            <div className="mt-2 text-xs text-gray-500">
-                              <p>
-                                This itinerary is public and can be viewed by anyone. You can share the link or embed it on your website.
-                              </p>
-                              <p className="mt-1 font-medium text-gray-800">
-                                Link: <span className="text-blue-600">{`${window.location.origin}/itinerary/${itinerary.id}`}</span>
-                              </p>
-                            </div>
-                          )}
                         </div>
                       </div>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
 
-          {sharedItineraries.length > 0 ? (
-            <section>
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">Shared with me</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {sharedItineraries.map((itinerary) => (
-                  <Link
-                    key={itinerary.id}
-                    to={`/itinerary/${itinerary.id}`}
-                    className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition cursor-pointer border border-violet-100"
-                  >
-                    <p className="inline-block text-xs font-semibold px-2 py-1 rounded-full bg-violet-100 text-violet-700 mb-2">
-                      Shared
-                    </p>
-                    <h3 className="text-xl font-bold text-gray-900 mb-2">{itinerary.title}</h3>
-                    {itinerary.description && <p className="text-gray-600 mb-3 line-clamp-2">{itinerary.description}</p>}
-                    <div className="text-sm text-gray-500 space-y-1">
-                      <p>📅 {format(parseISO(itinerary.startDate), 'MMM dd, yyyy')}</p>
-                      <p>📍 to {format(parseISO(itinerary.endDate), 'MMM dd, yyyy')}</p>
+                      {/* Share popup */}
+                      {activeShareItineraryId === itinerary.id && (
+                        <div className="absolute right-0 top-[calc(100%+6px)] z-20 w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-violet-200 bg-white p-4 shadow-2xl shadow-violet-100/50 space-y-4">
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm font-bold text-violet-700">Share & Export</p>
+                            <button
+                              type="button"
+                              onClick={() => setActiveShareItineraryId(null)}
+                              className="w-6 h-6 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 text-xs font-bold transition-colors"
+                            >
+                              ✕
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              disabled={actionLoading}
+                              onClick={() => handleCopyTripLink(itinerary.id)}
+                              className="px-3 py-2 text-xs font-semibold rounded-xl bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 transition-all"
+                            >
+                              Copy Link
+                            </button>
+                            <button
+                              type="button"
+                              disabled={actionLoading}
+                              onClick={() => handleCopyFormattedText(itinerary)}
+                              className="px-3 py-2 text-xs font-semibold rounded-xl bg-cyan-600 text-white hover:bg-cyan-700 disabled:opacity-50 transition-all"
+                            >
+                              Copy Text
+                            </button>
+                            <button
+                              type="button"
+                              disabled={actionLoading}
+                              onClick={() => handleExportPdf(itinerary)}
+                              className="col-span-2 px-3 py-2 text-xs font-semibold rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 transition-all"
+                            >
+                              Export PDF
+                            </button>
+                          </div>
+
+                          <form
+                            onSubmit={(e) => handleGrantShare(itinerary.id, e)}
+                            className="space-y-2 pt-2 border-t border-violet-100"
+                          >
+                            <p className="text-xs font-semibold text-slate-600">Grant Access</p>
+                            <input
+                              type="email"
+                              placeholder="user@example.com"
+                              value={shareEmail}
+                              onChange={(e) => setShareEmail(e.target.value)}
+                              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-slate-50 focus:bg-white focus:border-violet-400"
+                              required
+                            />
+                            <div className="flex gap-2">
+                              <select
+                                value={shareAccess}
+                                onChange={(e) => setShareAccess(e.target.value as 'view' | 'edit')}
+                                className="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-sm bg-slate-50"
+                              >
+                                <option value="view">View only</option>
+                                <option value="edit">Can edit</option>
+                              </select>
+                              <button
+                                type="submit"
+                                disabled={actionLoading}
+                                className="px-3 py-2 text-xs font-bold rounded-xl bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50"
+                              >
+                                Grant
+                              </button>
+                            </div>
+                          </form>
+
+                          <div className="pt-2 border-t border-violet-100">
+                            <button
+                              onClick={() => handleTogglePublic(itinerary)}
+                              disabled={actionLoading}
+                              className={`w-full px-3 py-2 text-xs font-bold rounded-xl transition-all ${
+                                itinerary.isPublic
+                                  ? 'bg-rose-100 text-rose-700 hover:bg-rose-200'
+                                  : 'bg-violet-100 text-violet-700 hover:bg-violet-200'
+                              }`}
+                            >
+                              {itinerary.isPublic ? '🔒 Make Private' : '🌐 Make Public'}
+                            </button>
+                            {itinerary.isPublic && (
+                              <p className="mt-2 text-[11px] text-slate-500 leading-relaxed">
+                                Public URL:{' '}
+                                <span className="text-violet-600 font-medium break-all">
+                                  {`${window.location.origin}/itinerary/${itinerary.id}`}
+                                </span>
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </Link>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </section>
-          ) : null}
-        </div>
-      )}
+
+            {/* Shared itineraries */}
+            {sharedItineraries.length > 0 && (
+              <section>
+                <h2 className="text-base font-bold text-slate-500 uppercase tracking-wider mb-5">
+                  Shared with Me
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {sharedItineraries.map((itinerary) => (
+                    <Link
+                      key={itinerary.id}
+                      to={`/itinerary/${itinerary.id}`}
+                      className="block bg-white rounded-2xl border border-slate-100 shadow-card hover:shadow-card-hover hover:-translate-y-0.5 transition-all duration-200 overflow-hidden group"
+                    >
+                      <div className="h-1 bg-gradient-to-r from-cyan-500 to-violet-500 rounded-t-2xl" />
+                      <div className="p-5">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 text-xs font-semibold mb-3">
+                          👥 Shared
+                        </span>
+                        <h3 className="text-lg font-bold text-slate-900 mb-1.5 leading-snug group-hover:text-violet-700 transition-colors">
+                          {itinerary.title}
+                        </h3>
+                        {itinerary.description && (
+                          <p className="text-slate-500 text-sm mb-3 line-clamp-2">
+                            {itinerary.description}
+                          </p>
+                        )}
+                        <div className="flex flex-col gap-1 text-xs text-slate-500">
+                          <span>📅 {format(parseISO(itinerary.startDate), 'MMM dd, yyyy')}</span>
+                          <span>🏁 {format(parseISO(itinerary.endDate), 'MMM dd, yyyy')}</span>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
 export default DashboardPage;
-

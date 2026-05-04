@@ -589,126 +589,138 @@ export function ItineraryDetailPage() {
   };
 
   if (loading || !itinerary) {
-    return <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-12">Loading...</div>;
+    return (
+      <div className="flex items-center justify-center py-24">
+        <div className="flex flex-col items-center gap-3 text-slate-400">
+          <div className="w-8 h-8 border-2 border-violet-200 border-t-violet-500 rounded-full animate-spin" />
+          <p className="text-sm font-medium">Loading trip…</p>
+        </div>
+      </div>
+    );
   }
 
   return (
+    <div className="min-h-screen bg-slate-50">
     <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-10">
       <button
         onClick={() => navigate('/dashboard')}
-        className="mb-4 sm:mb-6 px-4 py-2 text-indigo-700 bg-indigo-50 rounded-full hover:bg-indigo-100 font-semibold transition text-sm sm:text-base"
+        className="mb-5 sm:mb-7 inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-violet-700 bg-violet-50 rounded-xl hover:bg-violet-100 border border-violet-200 transition-all"
       >
         ← Back to Dashboard
       </button>
 
-      <div className="p-[1px] rounded-2xl bg-gradient-to-r from-fuchsia-500 via-violet-500 to-cyan-500 mb-8 shadow-2xl shadow-violet-200/60">
-        <div className="bg-white/95 backdrop-blur rounded-2xl p-4 sm:p-6">
-          <h1 className="text-3xl sm:text-4xl font-extrabold bg-gradient-to-r from-violet-700 via-fuchsia-600 to-cyan-600 bg-clip-text text-transparent mb-2 break-words">
+      {/* Trip header card */}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-card mb-8 overflow-hidden">
+        <div className="h-1 bg-gradient-to-r from-fuchsia-500 via-violet-500 to-cyan-500" />
+        <div className="p-5 sm:p-7">
+          <h1 className="text-2xl sm:text-4xl font-black bg-gradient-to-r from-violet-700 via-fuchsia-600 to-cyan-600 bg-clip-text text-transparent mb-2 break-words leading-tight">
             {itinerary.title}
           </h1>
-          {itinerary.description && <p className="text-gray-700 mb-4">{itinerary.description}</p>}
-          <div className="text-sm text-indigo-700 font-medium space-y-1 mb-4">
-            <p className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100">
-              ✨ Travel Window: {format(parseISO(itinerary.startDate), 'MMM dd, yyyy')} -{' '}
+          {itinerary.description && (
+            <p className="text-slate-600 mb-4 leading-relaxed">{itinerary.description}</p>
+          )}
+          <div className="mb-5">
+            <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-violet-50 border border-violet-100 text-violet-700 text-sm font-semibold">
+              ✈️ {format(parseISO(itinerary.startDate), 'MMM dd, yyyy')} –{' '}
               {format(parseISO(itinerary.endDate), 'MMM dd, yyyy')}
-            </p>
+            </span>
           </div>
           <div className="flex gap-2 flex-wrap">
-            {canEditTrip ? (
+            {canEditTrip && (
               <button
-                onClick={() => {
-                  setShowTripEditForm(!showTripEditForm);
-                }}
-                className="px-4 py-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white rounded-full hover:from-violet-700 hover:to-fuchsia-700 font-semibold shadow-lg shadow-fuchsia-200 transition"
+                onClick={() => setShowTripEditForm(!showTripEditForm)}
+                className="btn-primary px-4 py-2 text-sm"
               >
-                {showTripEditForm ? 'Cancel Trip Edit' : 'Edit Trip'}
+                {showTripEditForm ? '✕ Cancel Edit' : '✏️ Edit Trip'}
               </button>
-            ) : null}
-            {canEditTrip ? (
+            )}
+            {canEditTrip && (
               <button
                 onClick={handleDeleteTrip}
-                className="px-4 py-2 bg-gradient-to-r from-rose-500 to-red-600 text-white rounded-full hover:from-rose-600 hover:to-red-700 font-semibold shadow-lg shadow-rose-200 transition"
+                className="btn-danger px-4 py-2 text-sm"
               >
-                Delete Trip
+                🗑 Delete Trip
               </button>
-            ) : null}
+            )}
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
         <div className="lg:col-span-2">
-          {canEditTrip && showTripEditForm ? (
-            <div className="p-[1px] rounded-2xl bg-gradient-to-r from-violet-500 to-cyan-500 mb-8">
-              <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-lg">
-                <h2 className="text-xl font-bold text-gray-900 mb-4">Edit Trip Details</h2>
-                <form onSubmit={handleUpdateTrip} className="space-y-4">
+          {canEditTrip && showTripEditForm && (
+            <div className="bg-white rounded-2xl border border-violet-200 shadow-card mb-8 overflow-hidden animate-fade-in">
+              <div className="px-5 py-4 border-b border-violet-100 bg-gradient-to-r from-violet-50 to-fuchsia-50">
+                <h2 className="text-base font-bold text-slate-900">Edit Trip Details</h2>
+              </div>
+              <form onSubmit={handleUpdateTrip} className="p-5 space-y-4">
+                <div>
+                  <label className="form-label">Title</label>
+                  <input
+                    type="text"
+                    value={tripForm.title}
+                    onChange={(e) => setTripForm((prev) => ({ ...prev, title: e.target.value }))}
+                    required
+                    className="input-field"
+                  />
+                </div>
+                <div>
+                  <label className="form-label">Description</label>
+                  <textarea
+                    value={tripForm.description}
+                    onChange={(e) => setTripForm((prev) => ({ ...prev, description: e.target.value }))}
+                    rows={3}
+                    className="input-field resize-none"
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-semibold text-violet-700 mb-1">Title</label>
+                    <label className="form-label">Start Date</label>
                     <input
-                      type="text"
-                      value={tripForm.title}
-                      onChange={(e) => setTripForm((prev) => ({ ...prev, title: e.target.value }))}
+                      type="date"
+                      value={tripForm.startDate}
+                      onChange={(e) => setTripForm((prev) => ({ ...prev, startDate: e.target.value }))}
                       required
-                      className="w-full px-4 py-2 border border-violet-200 rounded-xl focus:ring-2 focus:ring-violet-400"
+                      className="input-field"
                     />
                   </div>
-
                   <div>
-                    <label className="block text-sm font-semibold text-violet-700 mb-1">Description</label>
-                    <textarea
-                      value={tripForm.description}
-                      onChange={(e) =>
-                        setTripForm((prev) => ({ ...prev, description: e.target.value }))
-                      }
-                      rows={3}
-                      className="w-full px-4 py-2 border border-violet-200 rounded-xl focus:ring-2 focus:ring-violet-400"
+                    <label className="form-label">End Date</label>
+                    <input
+                      type="date"
+                      value={tripForm.endDate}
+                      onChange={(e) => setTripForm((prev) => ({ ...prev, endDate: e.target.value }))}
+                      required
+                      className="input-field"
                     />
                   </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold text-violet-700 mb-1">Start Date</label>
-                      <input
-                        type="date"
-                        value={tripForm.startDate}
-                        onChange={(e) =>
-                          setTripForm((prev) => ({ ...prev, startDate: e.target.value }))
-                        }
-                        required
-                        className="w-full px-4 py-2 border border-violet-200 rounded-xl focus:ring-2 focus:ring-violet-400"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-violet-700 mb-1">End Date</label>
-                      <input
-                        type="date"
-                        value={tripForm.endDate}
-                        onChange={(e) => setTripForm((prev) => ({ ...prev, endDate: e.target.value }))}
-                        required
-                        className="w-full px-4 py-2 border border-violet-200 rounded-xl focus:ring-2 focus:ring-violet-400"
-                      />
-                    </div>
-                  </div>
-
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3">
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl hover:from-emerald-600 hover:to-teal-700 disabled:bg-gray-400 font-semibold"
+                    className="btn-primary flex-1 sm:flex-none py-3"
                   >
-                    {loading ? 'Updating Trip...' : 'Update Trip'}
+                    {loading ? (
+                      <span className="flex items-center gap-2">
+                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Updating…
+                      </span>
+                    ) : (
+                      'Update Trip'
+                    )}
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowTripEditForm(false)}
-                    className="w-full px-4 py-2 bg-gray-100 text-gray-800 rounded-xl hover:bg-gray-200 font-medium"
+                    className="flex-1 sm:flex-none px-5 py-3 rounded-xl font-semibold text-sm bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all"
                   >
                     Cancel
                   </button>
-                </form>
-              </div>
+                </div>
+              </form>
             </div>
-          ) : null}
+          )}
 
           <EntriesList
             entries={displayEntries}
@@ -723,192 +735,190 @@ export function ItineraryDetailPage() {
           />
         </div>
 
+        {/* Summary sidebar */}
         <div className="lg:col-span-1">
-          <div className="p-[1px] rounded-2xl bg-gradient-to-b from-cyan-400 via-violet-500 to-fuchsia-500 lg:sticky lg:top-6">
-            <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-xl">
-              <h3 className="text-lg font-extrabold bg-gradient-to-r from-violet-700 to-cyan-600 bg-clip-text text-transparent mb-4">
-                Summary
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-card lg:sticky lg:top-20 overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100 bg-gradient-to-r from-violet-50 to-fuchsia-50">
+              <h3 className="font-black text-base bg-gradient-to-r from-violet-700 to-fuchsia-600 bg-clip-text text-transparent">
+                Trip Summary
               </h3>
-              <div className="space-y-3 text-sm">
-                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-100">
-                  <p className="text-emerald-700 font-semibold">Trip Days</p>
-                  <p className="text-2xl font-extrabold text-emerald-600">
-                    {totalTripDays > 0 ? totalTripDays : 0}
-                  </p>
-                </div>
-                <div className="p-3 rounded-xl bg-sky-50 border border-sky-100">
-                  <p className="text-sky-700 font-semibold inline-flex items-center gap-2">
-                    You are flying on {flyingDaysCount} {flyingDaysCount === 1 ? 'day' : 'days'}
-                    <span className="relative group inline-flex">
-                      <span
-                        className="w-5 h-5 inline-flex items-center justify-center text-[11px] font-bold rounded-full bg-sky-200 text-sky-700 cursor-help"
-                        aria-label="Flights info"
-                      >
-                        i
-                      </span>
-                      <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 w-56 -translate-x-1/2 rounded-lg bg-gray-900 px-3 py-2 text-[11px] font-medium text-white opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
-                        You are flying {totalFlightsCount} flights
-                      </span>
-                    </span>
-                  </p>
-                </div>
-                <div className="p-3 rounded-xl bg-rose-50 border border-rose-100">
-                  <p className="text-rose-700 font-semibold inline-flex items-center gap-2">
-                    Your Cozy days are {cozyDaysCount} {cozyDaysCount === 1 ? 'day' : 'days'}
-                    <span className="relative group inline-flex">
-                      <span
-                        className="w-5 h-5 inline-flex items-center justify-center text-[11px] font-bold rounded-full bg-rose-200 text-rose-700 cursor-help"
-                        aria-label="Cozy days info"
-                      >
-                        i
-                      </span>
-                      <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 w-56 -translate-x-1/2 rounded-lg bg-gray-900 px-3 py-2 text-[11px] font-medium text-white opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
-                        Cozy days with no activity or journey
-                      </span>
-                    </span>
-                  </p>
-                </div>
-                <div className="p-3 rounded-xl bg-amber-50 border border-amber-100">
-                  <p className="text-amber-700 font-semibold inline-flex items-center gap-2">
-                    No Stay Days - {noStayDaysCount} {noStayDaysCount === 1 ? 'day' : 'days'}
-                    <span className="relative group inline-flex">
-                      <span
-                        className="w-5 h-5 inline-flex items-center justify-center text-[11px] font-bold rounded-full bg-amber-200 text-amber-700 cursor-help"
-                        aria-label="No stay days info"
-                      >
-                        i
-                      </span>
-                      <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 w-64 -translate-x-1/2 rounded-lg bg-gray-900 px-3 py-2 text-[11px] font-medium text-white opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
-                        Are you travelling over night for these days! Safe Travels!
-                      </span>
-                    </span>
-                  </p>
-                </div>
-                <div className="p-3 rounded-xl bg-lime-50 border border-lime-100">
-                  <p className="text-lime-700 font-semibold">
-                    Rest Days - {restDaysCount} {restDaysCount === 1 ? 'day' : 'days'}
-                  </p>
-                </div>
-                <div className="p-3 rounded-xl bg-orange-50 border border-orange-100">
-                  <p className="text-orange-700 font-semibold">
-                    Hectic Days - {hecticDaysCount} {hecticDaysCount === 1 ? 'day' : 'days'}
-                  </p>
-                </div>
-                {isOwner ? (
-                  <div id="share-export" className="p-3 rounded-xl bg-violet-50 border border-violet-100 space-y-3">
-                    <p className="text-violet-700 font-semibold">Share & Export</p>
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      {itinerary.isPublic ? (
-                        <button
-                          type="button"
-                          onClick={handleCopyPublicUrl}
-                          className="px-3 py-1.5 text-xs font-semibold rounded bg-emerald-600 text-white hover:bg-emerald-700 w-full sm:w-auto"
-                        >
-                          Copy Public URL
-                        </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        onClick={handleCopyFormattedText}
-                        className="px-3 py-1.5 text-xs font-semibold rounded bg-violet-600 text-white hover:bg-violet-700 w-full sm:w-auto"
-                      >
-                        Copy Formatted Text
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleExportPdf}
-                        className="px-3 py-1.5 text-xs font-semibold rounded bg-cyan-600 text-white hover:bg-cyan-700 w-full sm:w-auto"
-                      >
-                        Export PDF
-                      </button>
-                    </div>
-
-                    <form onSubmit={handleGrantShare} className="space-y-2">
-                      <input
-                        type="email"
-                        placeholder="user@example.com"
-                        value={shareEmail}
-                        onChange={(e) => setShareEmail(e.target.value)}
-                        className="w-full px-3 py-2 rounded border border-violet-200"
-                        required
-                      />
-                      <div className="flex flex-col sm:flex-row gap-2">
-                        <select
-                          value={shareAccess}
-                          onChange={(e) => setShareAccess(e.target.value as 'view' | 'edit')}
-                          className="flex-1 px-3 py-2 rounded border border-violet-200"
-                        >
-                          <option value="view">View access</option>
-                          <option value="edit">Edit access</option>
-                        </select>
-                        <button
-                          type="submit"
-                          className="px-3 py-2 text-xs font-semibold rounded bg-emerald-600 text-white hover:bg-emerald-700 w-full sm:w-auto"
-                        >
-                          Grant Access
-                        </button>
-                      </div>
-                    </form>
-
-                    <div className="space-y-2 max-h-48 overflow-auto pr-1">
-                      {shares.length === 0 ? (
-                        <p className="text-xs text-violet-600">No shared users yet.</p>
-                      ) : (
-                        shares.map((share: any) => (
-                          <div key={share.id} className="p-2 rounded border border-violet-200 bg-white space-y-2">
-                            <p className="text-xs font-medium text-gray-700 break-all">{share.email}</p>
-                            <div className="flex flex-col sm:flex-row gap-2">
-                              <select
-                                value={share.access}
-                                onChange={(e) =>
-                                  handleShareAccessChange(share.id, e.target.value as 'view' | 'edit')
-                                }
-                                className="flex-1 px-2 py-1 text-xs rounded border border-violet-200"
-                              >
-                                <option value="view">View</option>
-                                <option value="edit">Edit</option>
-                              </select>
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveShare(share.id)}
-                                className="px-2 py-1 text-xs rounded bg-rose-600 text-white hover:bg-rose-700"
-                              >
-                                Remove
-                              </button>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                ) : hasViewOnlyAccess && itinerary.isPublic ? (
-                  <div id="share-export" className="p-3 rounded-xl bg-violet-50 border border-violet-100 space-y-3">
-                    <p className="text-violet-700 font-semibold">Share</p>
-                    <button
-                      type="button"
-                      onClick={handleCopyPublicUrl}
-                      className="w-full px-3 py-1.5 text-xs font-semibold rounded bg-emerald-600 text-white hover:bg-emerald-700"
-                    >
-                      Copy Public URL
-                    </button>
-                  </div>
-                ) : isReadOnlyPublicView && itinerary.isPublic ? (
-                  <div id="share-export" className="p-3 rounded-xl bg-violet-50 border border-violet-100 space-y-3">
-                    <p className="text-violet-700 font-semibold">Share</p>
-                    <button
-                      type="button"
-                      onClick={handleCopyPublicUrl}
-                      className="w-full px-3 py-1.5 text-xs font-semibold rounded bg-emerald-600 text-white hover:bg-emerald-700"
-                    >
-                      Copy Public URL
-                    </button>
-                  </div>
-                ) : null}
+            </div>
+            <div className="p-4 space-y-2.5">
+              {/* Total days - big */}
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white">
+                <p className="text-xs font-semibold text-violet-200 mb-1">Total Trip</p>
+                <p className="text-3xl font-black">{totalTripDays > 0 ? totalTripDays : 0}</p>
+                <p className="text-violet-200 text-xs">days</p>
               </div>
+
+              {/* Stat rows */}
+              {[
+                {
+                  icon: '✈️',
+                  label: `Flying — ${flyingDaysCount} ${flyingDaysCount === 1 ? 'day' : 'days'}`,
+                  sub: `${totalFlightsCount} flight${totalFlightsCount !== 1 ? 's' : ''}`,
+                  bg: 'bg-sky-50',
+                  border: 'border-sky-100',
+                  textColor: 'text-sky-700',
+                },
+                {
+                  icon: '🛋️',
+                  label: `Cozy days — ${cozyDaysCount}`,
+                  sub: 'No activities or travel',
+                  bg: 'bg-rose-50',
+                  border: 'border-rose-100',
+                  textColor: 'text-rose-700',
+                },
+                {
+                  icon: '🌙',
+                  label: `No stay — ${noStayDaysCount} ${noStayDaysCount === 1 ? 'day' : 'days'}`,
+                  sub: 'Overnight travel days',
+                  bg: 'bg-amber-50',
+                  border: 'border-amber-100',
+                  textColor: 'text-amber-700',
+                },
+                {
+                  icon: '😴',
+                  label: `Rest days — ${restDaysCount}`,
+                  sub: 'No flights or activities',
+                  bg: 'bg-lime-50',
+                  border: 'border-lime-100',
+                  textColor: 'text-lime-700',
+                },
+                {
+                  icon: '⚡',
+                  label: `Hectic days — ${hecticDaysCount}`,
+                  sub: 'Flights + multiple events',
+                  bg: 'bg-orange-50',
+                  border: 'border-orange-100',
+                  textColor: 'text-orange-700',
+                },
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl ${stat.bg} border ${stat.border}`}
+                >
+                  <span className="text-base shrink-0">{stat.icon}</span>
+                  <div className="min-w-0">
+                    <p className={`text-xs font-semibold ${stat.textColor} leading-tight`}>
+                      {stat.label}
+                    </p>
+                    <p className="text-[10px] text-slate-400 leading-tight mt-0.5">{stat.sub}</p>
+                  </div>
+                </div>
+              ))}
+
+              {/* Share & Export */}
+              {isOwner ? (
+                <div id="share-export" className="pt-2 border-t border-slate-100 space-y-3 mt-2">
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Share & Export
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {itinerary.isPublic && (
+                      <button
+                        type="button"
+                        onClick={handleCopyPublicUrl}
+                        className="flex-1 px-3 py-2 text-xs font-semibold rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 transition-all"
+                      >
+                        Copy Public URL
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleCopyFormattedText}
+                      className="flex-1 px-3 py-2 text-xs font-semibold rounded-xl bg-violet-600 text-white hover:bg-violet-700 transition-all"
+                    >
+                      Copy Text
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleExportPdf}
+                      className="w-full px-3 py-2 text-xs font-semibold rounded-xl bg-cyan-600 text-white hover:bg-cyan-700 transition-all"
+                    >
+                      Export PDF
+                    </button>
+                  </div>
+
+                  <form onSubmit={handleGrantShare} className="space-y-2">
+                    <input
+                      type="email"
+                      placeholder="Grant access: user@example.com"
+                      value={shareEmail}
+                      onChange={(e) => setShareEmail(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm bg-slate-50 focus:bg-white focus:border-violet-400 text-slate-900 placeholder-slate-400 text-xs"
+                      required
+                    />
+                    <div className="flex gap-2">
+                      <select
+                        value={shareAccess}
+                        onChange={(e) => setShareAccess(e.target.value as 'view' | 'edit')}
+                        className="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-xs bg-slate-50"
+                      >
+                        <option value="view">View only</option>
+                        <option value="edit">Can edit</option>
+                      </select>
+                      <button
+                        type="submit"
+                        className="px-3 py-2 text-xs font-bold rounded-xl bg-amber-500 text-white hover:bg-amber-600 transition-all"
+                      >
+                        Grant
+                      </button>
+                    </div>
+                  </form>
+
+                  <div className="space-y-2 max-h-44 overflow-auto">
+                    {shares.length === 0 ? (
+                      <p className="text-xs text-slate-400 italic">No shared users yet.</p>
+                    ) : (
+                      shares.map((share: any) => (
+                        <div
+                          key={share.id}
+                          className="p-2.5 rounded-xl border border-slate-200 bg-white space-y-2"
+                        >
+                          <p className="text-xs font-semibold text-slate-700 break-all">
+                            {share.email}
+                          </p>
+                          <div className="flex gap-2">
+                            <select
+                              value={share.access}
+                              onChange={(e) =>
+                                handleShareAccessChange(share.id, e.target.value as 'view' | 'edit')
+                              }
+                              className="flex-1 px-2 py-1.5 text-xs rounded-lg border border-slate-200 bg-slate-50"
+                            >
+                              <option value="view">View</option>
+                              <option value="edit">Edit</option>
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveShare(share.id)}
+                              className="px-2 py-1.5 text-xs font-semibold rounded-lg bg-red-50 text-red-600 hover:bg-red-100 border border-red-100 transition-all"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              ) : (hasViewOnlyAccess || isReadOnlyPublicView) && itinerary.isPublic ? (
+                <div id="share-export" className="pt-2 border-t border-slate-100 mt-2">
+                  <button
+                    type="button"
+                    onClick={handleCopyPublicUrl}
+                    className="w-full px-3 py-2.5 text-xs font-bold rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 transition-all"
+                  >
+                    Copy Public URL
+                  </button>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
       </div>
+    </div>
     </div>
   );
 }

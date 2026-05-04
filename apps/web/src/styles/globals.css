@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -6,11 +8,69 @@
   @apply box-border;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
-  @apply bg-gradient-to-br from-indigo-50 via-fuchsia-50 to-cyan-50 min-h-screen;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  @apply bg-slate-50 min-h-screen text-slate-900;
 }
 
-input, textarea, select {
-  @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-0;
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
 }
 
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-violet-300/70 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-violet-400;
+}
+
+input,
+textarea,
+select {
+  @apply focus:outline-none focus:ring-2 focus:ring-violet-400/60 focus:ring-offset-0 transition-all duration-200;
+}
+
+button {
+  @apply transition-all duration-200;
+}
+
+@layer utilities {
+  .gradient-text {
+    @apply bg-gradient-to-r from-violet-600 via-fuchsia-500 to-cyan-500 bg-clip-text text-transparent;
+  }
+
+  .hero-gradient {
+    background: linear-gradient(135deg, #1e1b4b 0%, #312e81 30%, #0c4a6e 70%, #164e63 100%);
+  }
+
+  .card-hover {
+    @apply hover:shadow-card-hover hover:-translate-y-0.5 transition-all duration-200;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-semibold rounded-xl px-5 py-2.5 hover:from-violet-700 hover:to-fuchsia-700 shadow-lg shadow-violet-200/60 hover:shadow-violet-300/70 hover:-translate-y-px transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed;
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center justify-center bg-gradient-to-r from-rose-500 to-red-600 text-white font-semibold rounded-xl px-5 py-2.5 hover:from-rose-600 hover:to-red-700 shadow-lg shadow-rose-200/60 transition-all duration-200;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:bg-white focus:border-violet-400 transition-all duration-200;
+  }
+
+  .form-label {
+    @apply block text-sm font-semibold text-slate-700 mb-1.5;
+  }
+}

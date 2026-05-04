@@ -11,7 +11,7 @@ import PublicItinerariesPage from '@/pages/PublicItinerariesPage';
 function App() {
   return (
     <Router>
-      <div className="min-h-screen bg-gray-50 overflow-x-hidden">
+      <div className="min-h-screen bg-slate-50 overflow-x-hidden">
         <Header />
         <Routes>
           <Route path="/" element={<HomePage />} />
