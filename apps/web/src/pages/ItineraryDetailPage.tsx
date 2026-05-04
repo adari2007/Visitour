@@ -519,23 +519,19 @@ export function ItineraryDetailPage() {
               dispatch(deleteEntry(flightEntry.id)).unwrap()
             )
           );
-          console.log('Transport entries deleted successfully');
         } catch (err) {
           console.error('Failed to delete flight entries:', err);
-          window.alert('Failed to delete one or more flight entries. Please try again.');
+          toast('Failed to delete one or more flight entries. Please try again.', 'error');
         }
         return;
       }
 
-      console.log('Other entry type - single delete');
       if (window.confirm('Are you sure you want to delete this entry?')) {
         try {
-          console.log('Dispatching deleteEntry for:', entry.id);
           await dispatch(deleteEntry(entry.id)).unwrap();
-          console.log('Entry deleted successfully');
         } catch (err) {
           console.error('Failed to delete entry:', err);
-          window.alert('Failed to delete entry. Please try again.');
+          toast('Failed to delete entry. Please try again.', 'error');
         }
       }
     };
@@ -544,12 +540,12 @@ export function ItineraryDetailPage() {
     e.preventDefault();
     if (!id) return;
     if (!canEditTrip) {
-      window.alert('This public itinerary is read-only for non-owners.');
+      toast('This itinerary is read-only.', 'warning');
       return;
     }
 
     if (tripForm.startDate > tripForm.endDate) {
-      window.alert('End date must be on or after start date.');
+      toast('End date must be on or after start date.', 'warning');
       return;
     }
 
@@ -567,19 +563,20 @@ export function ItineraryDetailPage() {
       ).unwrap();
 
       setShowTripEditForm(false);
+      toast('Trip updated!', 'success');
     } catch (err) {
       console.error('Failed to update itinerary:', err);
-      window.alert('Failed to update itinerary. Please try again.');
+      toast('Failed to update trip. Please try again.', 'error');
     }
   };
 
   const handleDeleteTrip = async () => {
     if (!id) return;
     if (!canEditTrip) {
-      window.alert('This public itinerary is read-only for non-owners.');
+      toast('This itinerary is read-only.', 'warning');
       return;
     }
-    if (!window.confirm('Are you sure you want to delete this trip? This will also remove all entries.')) {
+    if (!window.confirm('Delete this trip and all its entries? This cannot be undone.')) {
       return;
     }
 
@@ -588,7 +585,7 @@ export function ItineraryDetailPage() {
       navigate('/dashboard');
     } catch (err) {
       console.error('Failed to delete itinerary:', err);
-      window.alert('Failed to delete trip. Please try again.');
+      toast('Failed to delete trip. Please try again.', 'error');
     }
   };
 
@@ -603,6 +600,14 @@ export function ItineraryDetailPage() {
     );
   }
 
+  const accessLabel = isOwner
+    ? { label: 'Owner', bg: 'bg-violet-100', text: 'text-violet-700' }
+    : userShareAccess === 'edit'
+    ? { label: 'Editor', bg: 'bg-cyan-100', text: 'text-cyan-700' }
+    : isReadOnlyPublicView
+    ? { label: 'Public View', bg: 'bg-emerald-100', text: 'text-emerald-700' }
+    : { label: 'Viewer', bg: 'bg-slate-100', text: 'text-slate-600' };
+
   return (
     <div className="min-h-screen bg-slate-50">
     <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-10">
@@ -613,21 +618,46 @@ export function ItineraryDetailPage() {
         ← Back to Dashboard
       </button>
 
+      {/* Read-only banner */}
+      {!canManageEntries && (
+        <div className="mb-6 flex items-center gap-3 px-4 py-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+          <span className="text-base shrink-0">👁</span>
+          <span className="font-medium">
+            {isReadOnlyPublicView
+              ? 'You are viewing a public itinerary in read-only mode.'
+              : 'You have view-only access to this shared itinerary.'}
+          </span>
+        </div>
+      )}
+
       {/* Trip header card */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-card mb-8 overflow-hidden">
         <div className="h-1 bg-gradient-to-r from-fuchsia-500 via-violet-500 to-cyan-500" />
         <div className="p-5 sm:p-7">
-          <h1 className="text-2xl sm:text-4xl font-black bg-gradient-to-r from-violet-700 via-fuchsia-600 to-cyan-600 bg-clip-text text-transparent mb-2 break-words leading-tight">
-            {itinerary.title}
-          </h1>
+          <div className="flex items-start justify-between gap-3 mb-2">
+            <h1 className="text-2xl sm:text-4xl font-black bg-gradient-to-r from-violet-700 via-fuchsia-600 to-cyan-600 bg-clip-text text-transparent break-words leading-tight flex-1">
+              {itinerary.title}
+            </h1>
+            <span className={`shrink-0 mt-1 inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${accessLabel.bg} ${accessLabel.text}`}>
+              {accessLabel.label}
+            </span>
+          </div>
           {itinerary.description && (
             <p className="text-slate-600 mb-4 leading-relaxed">{itinerary.description}</p>
           )}
-          <div className="mb-5">
+          <div className="flex flex-wrap items-center gap-2 mb-5">
             <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-violet-50 border border-violet-100 text-violet-700 text-sm font-semibold">
               ✈️ {format(parseISO(itinerary.startDate), 'MMM dd, yyyy')} –{' '}
               {format(parseISO(itinerary.endDate), 'MMM dd, yyyy')}
             </span>
+            <span className="px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 text-sm font-semibold">
+              {totalTripDays} day{totalTripDays !== 1 ? 's' : ''}
+            </span>
+            {itinerary.isPublic && (
+              <span className="px-2.5 py-1.5 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-700 text-xs font-semibold">
+                🌐 Public
+              </span>
+            )}
           </div>
           <div className="flex gap-2 flex-wrap">
             {canEditTrip && (

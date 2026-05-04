@@ -61,10 +61,10 @@ export function Header() {
               </Link>
               <div className="flex items-center gap-2.5 ml-3 pl-3 border-l border-slate-200">
                 <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white text-xs font-bold shadow">
-                  {user.email[0].toUpperCase()}
+                  {(user.firstName || user.email)[0].toUpperCase()}
                 </div>
                 <span className="text-xs text-slate-500 max-w-[130px] truncate hidden md:block">
-                  {user.email}
+                  {user.firstName ? `${user.firstName}${user.lastName ? ' ' + user.lastName : ''}` : user.email}
                 </span>
                 <button
                   onClick={handleLogout}
@@ -124,10 +124,15 @@ export function Header() {
             {token && user ? (
               <>
                 <div className="flex items-center gap-3 px-3 py-2 mb-3 bg-violet-50 rounded-xl">
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white font-bold shadow">
-                    {user.email[0].toUpperCase()}
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white font-bold shadow shrink-0">
+                    {(user.firstName || user.email)[0].toUpperCase()}
                   </div>
                   <div className="min-w-0">
+                    {user.firstName && (
+                      <p className="text-sm font-semibold text-slate-800 truncate">
+                        {user.firstName}{user.lastName ? ' ' + user.lastName : ''}
+                      </p>
+                    )}
                     <p className="text-xs text-slate-500 truncate">{user.email}</p>
                   </div>
                 </div>
