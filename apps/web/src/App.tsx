@@ -7,21 +7,24 @@ import RegisterPage from '@/pages/RegisterPage';
 import DashboardPage from '@/pages/DashboardPage';
 import ItineraryDetailPage from '@/pages/ItineraryDetailPage';
 import PublicItinerariesPage from '@/pages/PublicItinerariesPage';
+import { ToastProvider } from '@/components/Toast';
 
 function App() {
   return (
     <Router>
-      <div className="min-h-screen bg-slate-50 overflow-x-hidden">
-        <Header />
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
+      <ToastProvider>
+        <div className="min-h-screen bg-slate-50 overflow-x-hidden">
+          <Header />
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/public" element={<PublicItinerariesPage />} />
-          <Route path="/itinerary/:id" element={<ItineraryDetailPage />} />
-        </Routes>
-      </div>
+            <Route path="/itinerary/:id" element={<ItineraryDetailPage />} />
+          </Routes>
+        </div>
+      </ToastProvider>
     </Router>
   );
 }

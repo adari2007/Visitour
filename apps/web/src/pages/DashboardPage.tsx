@@ -1,13 +1,43 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { fetchItineraries, createItinerary } from '@/store/itinerarySlice';
+import { fetchItineraries, createItinerary, deleteItinerary } from '@/store/itinerarySlice';
 import { entriesAPI, sharesAPI, itinerariesAPI } from '@/services/api';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isAfter, isBefore, isToday, differenceInCalendarDays } from 'date-fns';
+import { useToast } from '@/components/Toast';
+
+type TripStatus = 'upcoming' | 'active' | 'past';
+
+function getTripStatus(startDate: string, endDate: string): TripStatus {
+  const start = parseISO(startDate);
+  const end = parseISO(endDate);
+  const now = new Date();
+  if (isAfter(start, now) && !isToday(start)) return 'upcoming';
+  if (isBefore(end, now) && !isToday(end)) return 'past';
+  return 'active';
+}
+
+function getTripDays(startDate: string, endDate: string) {
+  return differenceInCalendarDays(parseISO(endDate), parseISO(startDate)) + 1;
+}
+
+function getGreeting(firstName?: string) {
+  const hour = new Date().getHours();
+  const timeGreeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const name = firstName?.trim() || null;
+  return name ? `${timeGreeting}, ${name}!` : `${timeGreeting}!`;
+}
+
+const STATUS_CONFIG: Record<TripStatus, { label: string; bg: string; text: string }> = {
+  upcoming: { label: 'Upcoming', bg: 'bg-violet-100', text: 'text-violet-700' },
+  active: { label: 'Active now', bg: 'bg-emerald-100', text: 'text-emerald-700' },
+  past: { label: 'Past', bg: 'bg-slate-100', text: 'text-slate-500' },
+};
 
 export function DashboardPage() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const { user, token } = useAppSelector((state) => state.auth);
   const { items: itineraries, loading } = useAppSelector((state) => state.itineraries);
   const [showForm, setShowForm] = useState(false);
@@ -15,7 +45,6 @@ export function DashboardPage() {
   const [shareEmail, setShareEmail] = useState('');
   const [shareAccess, setShareAccess] = useState<'view' | 'edit'>('view');
   const [actionLoading, setActionLoading] = useState(false);
-  const [hideDetailsOnPublic, setHideDetailsOnPublic] = useState<Record<string, boolean>>({});
   const [newItinerary, setNewItinerary] = useState({
     title: '',
     description: '',
@@ -23,17 +52,31 @@ export function DashboardPage() {
     endDate: '',
   });
 
-  const ownedItineraries = itineraries.filter(
-    (itinerary) =>
-      !itinerary.ownerId || itinerary.ownerId === user?.id || itinerary.ownerEmail === user?.email
-  );
+  const ownedItineraries = itineraries
+    .filter(
+      (it) => !it.ownerId || it.ownerId === user?.id || it.ownerEmail === user?.email
+    )
+    .slice()
+    .sort((a, b) => {
+      // Sort: active first, then upcoming, then past; within each group by startDate
+      const order: Record<TripStatus, number> = { active: 0, upcoming: 1, past: 2 };
+      const statusA = getTripStatus(a.startDate, a.endDate);
+      const statusB = getTripStatus(b.startDate, b.endDate);
+      if (order[statusA] !== order[statusB]) return order[statusA] - order[statusB];
+      return a.startDate.localeCompare(b.startDate);
+    });
+
   const sharedItineraries = itineraries.filter(
-    (itinerary) =>
-      itinerary.ownerId &&
-      itinerary.ownerId !== user?.id &&
-      itinerary.ownerEmail !== user?.email &&
-      !itinerary.isPublic
+    (it) =>
+      it.ownerId &&
+      it.ownerId !== user?.id &&
+      it.ownerEmail !== user?.email &&
+      !it.isPublic
   );
+
+  const upcomingCount = ownedItineraries.filter(
+    (it) => getTripStatus(it.startDate, it.endDate) !== 'past'
+  ).length;
 
   useEffect(() => {
     if (!token) {
@@ -45,12 +88,29 @@ export function DashboardPage() {
 
   const handleCreateItinerary = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (newItinerary.startDate > newItinerary.endDate) {
+      toast('End date must be on or after start date.', 'warning');
+      return;
+    }
     try {
       await dispatch(createItinerary({ ...newItinerary, isPublic: false })).unwrap();
       setNewItinerary({ title: '', description: '', startDate: '', endDate: '' });
       setShowForm(false);
+      toast('Trip created!', 'success');
     } catch (err) {
       console.error('Failed to create itinerary:', err);
+      toast('Failed to create trip. Please try again.', 'error');
+    }
+  };
+
+  const handleDeleteItinerary = async (itinerary: any) => {
+    if (!window.confirm(`Delete "${itinerary.title}"? This will remove all entries.`)) return;
+    try {
+      await dispatch(deleteItinerary(itinerary.id)).unwrap();
+      toast('Trip deleted.', 'success');
+    } catch (err) {
+      console.error('Failed to delete itinerary:', err);
+      toast('Failed to delete trip. Please try again.', 'error');
     }
   };
 
@@ -87,10 +147,9 @@ export function DashboardPage() {
   const handleCopyTripLink = async (itineraryId: string) => {
     try {
       await navigator.clipboard.writeText(`${window.location.origin}/itinerary/${itineraryId}`);
-      window.alert('Trip link copied to clipboard.');
-    } catch (err) {
-      console.error('Failed to copy trip link:', err);
-      window.alert('Failed to copy trip link. Please try again.');
+      toast('Trip link copied!', 'success');
+    } catch {
+      toast('Failed to copy trip link.', 'error');
     }
   };
 
@@ -100,10 +159,9 @@ export function DashboardPage() {
       const response = await entriesAPI.getByItinerary(itinerary.id);
       const text = buildFormattedText(itinerary, response.data.entries || []);
       await navigator.clipboard.writeText(text);
-      window.alert('Formatted itinerary copied to clipboard.');
-    } catch (err) {
-      console.error('Failed to copy formatted text:', err);
-      window.alert('Failed to copy formatted text. Please try again.');
+      toast('Itinerary copied to clipboard!', 'success');
+    } catch {
+      toast('Failed to copy. Please try again.', 'error');
     } finally {
       setActionLoading(false);
     }
@@ -117,31 +175,26 @@ export function DashboardPage() {
       const content = text.replace(/\n/g, '<br/>');
       const printWindow = window.open('', '_blank', 'width=900,height=700');
       if (!printWindow) {
-        window.alert('Unable to open print window. Please allow popups.');
+        toast('Unable to open print window. Allow popups and try again.', 'warning');
         return;
       }
       printWindow.document.write(`
         <html>
           <head>
             <title>${itinerary.title || 'Itinerary'} - PDF</title>
-            <style>
-              body { font-family: Arial, sans-serif; padding: 24px; line-height: 1.5; }
-              h1 { margin-bottom: 12px; }
-              .content { white-space: normal; }
-            </style>
+            <style>body { font-family: Arial, sans-serif; padding: 24px; line-height: 1.5; }</style>
           </head>
           <body>
             <h1>${itinerary.title || 'Itinerary'}</h1>
-            <div class="content">${content}</div>
+            <div>${content}</div>
           </body>
         </html>
       `);
       printWindow.document.close();
       printWindow.focus();
       printWindow.print();
-    } catch (err) {
-      console.error('Failed to export PDF:', err);
-      window.alert('Failed to export PDF. Please try again.');
+    } catch {
+      toast('Failed to export PDF.', 'error');
     } finally {
       setActionLoading(false);
     }
@@ -150,7 +203,7 @@ export function DashboardPage() {
   const handleGrantShare = async (itineraryId: string, e: React.FormEvent) => {
     e.preventDefault();
     if (!shareEmail.trim()) {
-      window.alert('Please enter an email address.');
+      toast('Please enter an email address.', 'warning');
       return;
     }
     setActionLoading(true);
@@ -158,10 +211,9 @@ export function DashboardPage() {
       await sharesAPI.create(itineraryId, { email: shareEmail.trim(), access: shareAccess });
       setShareEmail('');
       setShareAccess('view');
-      window.alert('Access granted successfully.');
-    } catch (err) {
-      console.error('Failed to grant share access:', err);
-      window.alert('Failed to grant access. Please try again.');
+      toast('Access granted!', 'success');
+    } catch {
+      toast('Failed to grant access. Please try again.', 'error');
     } finally {
       setActionLoading(false);
     }
@@ -172,14 +224,12 @@ export function DashboardPage() {
     try {
       await itinerariesAPI.updatePublicStatus(itinerary.id, !itinerary.isPublic);
       dispatch(fetchItineraries());
-      window.alert(
-        `Itinerary is now ${!itinerary.isPublic ? 'public' : 'private'}. ${
-          !itinerary.isPublic ? 'It will appear in the Public Itineraries section.' : ''
-        }`
+      toast(
+        itinerary.isPublic ? 'Trip is now private.' : 'Trip is now public!',
+        'success'
       );
-    } catch (err) {
-      console.error('Failed to update public status:', err);
-      window.alert('Failed to update itinerary visibility. Please try again.');
+    } catch {
+      toast('Failed to update visibility.', 'error');
     } finally {
       setActionLoading(false);
     }
@@ -189,8 +239,8 @@ export function DashboardPage() {
     return (
       <div className="flex items-center justify-center py-24">
         <div className="flex flex-col items-center gap-3 text-slate-500">
-          <div className="w-10 h-10 border-3 border-violet-300 border-t-violet-600 rounded-full animate-spin" />
-          <p className="text-sm font-medium">Loading your trips…</p>
+          <div className="w-10 h-10 border-2 border-violet-300 border-t-violet-600 rounded-full animate-spin" />
+          <p className="text-sm font-medium">Loading…</p>
         </div>
       </div>
     );
@@ -201,20 +251,30 @@ export function DashboardPage() {
       {/* Page header */}
       <div className="bg-white border-b border-slate-100 shadow-sm">
         <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div>
               <h1 className="text-2xl sm:text-3xl font-black text-slate-900 mb-1">
-                My Itineraries
+                {getGreeting(user.firstName)}
               </h1>
-              <p className="text-slate-500 text-sm">
-                {ownedItineraries.length === 0
-                  ? 'Create your first trip to get started'
-                  : `${ownedItineraries.length} trip${ownedItineraries.length !== 1 ? 's' : ''} planned`}
-              </p>
+              <div className="flex flex-wrap items-center gap-2 mt-2">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-violet-50 text-violet-700 text-xs font-semibold border border-violet-100">
+                  🗺️ {ownedItineraries.length} trip{ownedItineraries.length !== 1 ? 's' : ''}
+                </span>
+                {upcomingCount > 0 && (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-100">
+                    📅 {upcomingCount} upcoming
+                  </span>
+                )}
+                {sharedItineraries.length > 0 && (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-cyan-50 text-cyan-700 text-xs font-semibold border border-cyan-100">
+                    👥 {sharedItineraries.length} shared with you
+                  </span>
+                )}
+              </div>
             </div>
             <button
               onClick={() => setShowForm(!showForm)}
-              className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all w-full sm:w-auto ${
+              className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all w-full sm:w-auto shrink-0 ${
                 showForm
                   ? 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                   : 'btn-primary'
@@ -246,7 +306,9 @@ export function DashboardPage() {
                 />
               </div>
               <div>
-                <label className="form-label">Description <span className="font-normal text-slate-400">(optional)</span></label>
+                <label className="form-label">
+                  Description <span className="font-normal text-slate-400">(optional)</span>
+                </label>
                 <textarea
                   value={newItinerary.description}
                   onChange={(e) => setNewItinerary((p) => ({ ...p, description: e.target.value }))}
@@ -274,14 +336,12 @@ export function DashboardPage() {
                     onChange={(e) => setNewItinerary((p) => ({ ...p, endDate: e.target.value }))}
                     required
                     className="input-field"
+                    min={newItinerary.startDate || undefined}
                   />
                 </div>
               </div>
               <div className="flex flex-col sm:flex-row gap-3 pt-1">
-                <button
-                  type="submit"
-                  className="btn-primary flex-1 sm:flex-none py-3"
-                >
+                <button type="submit" className="btn-primary flex-1 sm:flex-none py-3">
                   Create Trip
                 </button>
                 <button
@@ -307,7 +367,7 @@ export function DashboardPage() {
           <div className="space-y-10">
             {/* Owned itineraries */}
             <section>
-              <h2 className="text-base font-bold text-slate-500 uppercase tracking-wider mb-5">
+              <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-5">
                 Your Trips
               </h2>
 
@@ -329,198 +389,236 @@ export function DashboardPage() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {ownedItineraries.map((itinerary) => (
-                    <div
-                      key={itinerary.id}
-                      className="relative bg-white rounded-2xl border border-slate-100 shadow-card hover:shadow-card-hover hover:-translate-y-0.5 transition-all duration-200 overflow-visible"
-                    >
-                      {/* Top accent bar */}
-                      <div className="h-1 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-500 rounded-t-2xl" />
+                  {ownedItineraries.map((itinerary) => {
+                    const status = getTripStatus(itinerary.startDate, itinerary.endDate);
+                    const days = getTripDays(itinerary.startDate, itinerary.endDate);
+                    const statusCfg = STATUS_CONFIG[status];
+                    return (
+                      <div
+                        key={itinerary.id}
+                        className="relative bg-white rounded-2xl border border-slate-100 shadow-card hover:shadow-card-hover hover:-translate-y-0.5 transition-all duration-200 overflow-visible flex flex-col"
+                      >
+                        {/* Top accent bar */}
+                        <div className="h-1 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-500 rounded-t-2xl shrink-0" />
 
-                      <div className="p-5">
-                        {/* Public badge */}
-                        {itinerary.isPublic && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold mb-3">
-                            🌐 Public
-                          </span>
-                        )}
-
-                        <h3 className="text-lg font-bold text-slate-900 mb-1.5 leading-snug">
-                          {itinerary.title}
-                        </h3>
-                        {itinerary.description && (
-                          <p className="text-slate-500 text-sm mb-3 line-clamp-2 leading-relaxed">
-                            {itinerary.description}
-                          </p>
-                        )}
-
-                        <div className="flex flex-col gap-1 text-xs text-slate-500 mb-4">
-                          <span className="flex items-center gap-1.5">
-                            <span className="text-violet-400">📅</span>
-                            {format(parseISO(itinerary.startDate), 'MMM dd, yyyy')}
-                          </span>
-                          <span className="flex items-center gap-1.5">
-                            <span className="text-fuchsia-400">🏁</span>
-                            {format(parseISO(itinerary.endDate), 'MMM dd, yyyy')}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-                          <Link
-                            to={`/itinerary/${itinerary.id}`}
-                            className="text-sm font-bold text-violet-600 hover:text-violet-700 transition-colors"
-                          >
-                            Open Trip →
-                          </Link>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setActiveShareItineraryId((prev) =>
-                                prev === itinerary.id ? null : itinerary.id
-                              )
-                            }
-                            className="inline-flex items-center gap-1.5 text-sm font-semibold text-fuchsia-600 hover:text-fuchsia-700 transition-colors"
-                          >
-                            <span>🔗</span> Share
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Share popup */}
-                      {activeShareItineraryId === itinerary.id && (
-                        <div className="absolute right-0 top-[calc(100%+6px)] z-20 w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-violet-200 bg-white p-4 shadow-2xl shadow-violet-100/50 space-y-4">
-                          <div className="flex items-center justify-between">
-                            <p className="text-sm font-bold text-violet-700">Share & Export</p>
-                            <button
-                              type="button"
-                              onClick={() => setActiveShareItineraryId(null)}
-                              className="w-6 h-6 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 text-xs font-bold transition-colors"
-                            >
-                              ✕
-                            </button>
+                        <div className="p-5 flex flex-col flex-1">
+                          {/* Badges row */}
+                          <div className="flex items-center gap-2 mb-3 flex-wrap">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${statusCfg.bg} ${statusCfg.text}`}>
+                              {statusCfg.label}
+                            </span>
+                            {itinerary.isPublic && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">
+                                🌐 Public
+                              </span>
+                            )}
+                            <span className="ml-auto text-xs font-semibold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-100">
+                              {days} day{days !== 1 ? 's' : ''}
+                            </span>
                           </div>
 
-                          <div className="grid grid-cols-2 gap-2">
-                            <button
-                              type="button"
-                              disabled={actionLoading}
-                              onClick={() => handleCopyTripLink(itinerary.id)}
-                              className="px-3 py-2 text-xs font-semibold rounded-xl bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 transition-all"
-                            >
-                              Copy Link
-                            </button>
-                            <button
-                              type="button"
-                              disabled={actionLoading}
-                              onClick={() => handleCopyFormattedText(itinerary)}
-                              className="px-3 py-2 text-xs font-semibold rounded-xl bg-cyan-600 text-white hover:bg-cyan-700 disabled:opacity-50 transition-all"
-                            >
-                              Copy Text
-                            </button>
-                            <button
-                              type="button"
-                              disabled={actionLoading}
-                              onClick={() => handleExportPdf(itinerary)}
-                              className="col-span-2 px-3 py-2 text-xs font-semibold rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 transition-all"
-                            >
-                              Export PDF
-                            </button>
+                          <h3 className="text-base font-bold text-slate-900 mb-1.5 leading-snug">
+                            {itinerary.title}
+                          </h3>
+                          {itinerary.description && (
+                            <p className="text-slate-500 text-sm mb-3 line-clamp-2 leading-relaxed">
+                              {itinerary.description}
+                            </p>
+                          )}
+
+                          <div className="flex flex-col gap-1 text-xs text-slate-500 mb-4 mt-auto">
+                            <span className="flex items-center gap-1.5">
+                              <span className="text-violet-400">📅</span>
+                              {format(parseISO(itinerary.startDate), 'MMM dd, yyyy')}
+                              <span className="text-slate-300 mx-0.5">→</span>
+                              {format(parseISO(itinerary.endDate), 'MMM dd, yyyy')}
+                            </span>
                           </div>
 
-                          <form
-                            onSubmit={(e) => handleGrantShare(itinerary.id, e)}
-                            className="space-y-2 pt-2 border-t border-violet-100"
-                          >
-                            <p className="text-xs font-semibold text-slate-600">Grant Access</p>
-                            <input
-                              type="email"
-                              placeholder="user@example.com"
-                              value={shareEmail}
-                              onChange={(e) => setShareEmail(e.target.value)}
-                              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-slate-50 focus:bg-white focus:border-violet-400"
-                              required
-                            />
-                            <div className="flex gap-2">
-                              <select
-                                value={shareAccess}
-                                onChange={(e) => setShareAccess(e.target.value as 'view' | 'edit')}
-                                className="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-sm bg-slate-50"
-                              >
-                                <option value="view">View only</option>
-                                <option value="edit">Can edit</option>
-                              </select>
+                          <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                            <Link
+                              to={`/itinerary/${itinerary.id}`}
+                              className="text-sm font-bold text-violet-600 hover:text-violet-700 transition-colors"
+                            >
+                              Open →
+                            </Link>
+                            <div className="flex items-center gap-2">
                               <button
-                                type="submit"
-                                disabled={actionLoading}
-                                className="px-3 py-2 text-xs font-bold rounded-xl bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50"
+                                type="button"
+                                onClick={() =>
+                                  setActiveShareItineraryId((prev) =>
+                                    prev === itinerary.id ? null : itinerary.id
+                                  )
+                                }
+                                className="inline-flex items-center gap-1 text-xs font-semibold text-fuchsia-600 hover:text-fuchsia-700 px-2 py-1 rounded-lg hover:bg-fuchsia-50 transition-all"
                               >
-                                Grant
+                                🔗 Share
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteItinerary(itinerary)}
+                                className="text-xs font-semibold text-slate-400 hover:text-red-600 px-2 py-1 rounded-lg hover:bg-red-50 transition-all"
+                                title="Delete trip"
+                              >
+                                🗑
                               </button>
                             </div>
-                          </form>
-
-                          <div className="pt-2 border-t border-violet-100">
-                            <button
-                              onClick={() => handleTogglePublic(itinerary)}
-                              disabled={actionLoading}
-                              className={`w-full px-3 py-2 text-xs font-bold rounded-xl transition-all ${
-                                itinerary.isPublic
-                                  ? 'bg-rose-100 text-rose-700 hover:bg-rose-200'
-                                  : 'bg-violet-100 text-violet-700 hover:bg-violet-200'
-                              }`}
-                            >
-                              {itinerary.isPublic ? '🔒 Make Private' : '🌐 Make Public'}
-                            </button>
-                            {itinerary.isPublic && (
-                              <p className="mt-2 text-[11px] text-slate-500 leading-relaxed">
-                                Public URL:{' '}
-                                <span className="text-violet-600 font-medium break-all">
-                                  {`${window.location.origin}/itinerary/${itinerary.id}`}
-                                </span>
-                              </p>
-                            )}
                           </div>
                         </div>
-                      )}
-                    </div>
-                  ))}
+
+                        {/* Share popup */}
+                        {activeShareItineraryId === itinerary.id && (
+                          <div className="absolute right-0 top-[calc(100%+6px)] z-20 w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-violet-200 bg-white p-4 shadow-2xl shadow-violet-100/50 space-y-4">
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm font-bold text-violet-700">Share & Export</p>
+                              <button
+                                type="button"
+                                onClick={() => setActiveShareItineraryId(null)}
+                                className="w-6 h-6 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 text-xs font-bold transition-colors"
+                              >
+                                ✕
+                              </button>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                              <button
+                                type="button"
+                                disabled={actionLoading}
+                                onClick={() => handleCopyTripLink(itinerary.id)}
+                                className="px-3 py-2 text-xs font-semibold rounded-xl bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 transition-all"
+                              >
+                                Copy Link
+                              </button>
+                              <button
+                                type="button"
+                                disabled={actionLoading}
+                                onClick={() => handleCopyFormattedText(itinerary)}
+                                className="px-3 py-2 text-xs font-semibold rounded-xl bg-cyan-600 text-white hover:bg-cyan-700 disabled:opacity-50 transition-all"
+                              >
+                                Copy Text
+                              </button>
+                              <button
+                                type="button"
+                                disabled={actionLoading}
+                                onClick={() => handleExportPdf(itinerary)}
+                                className="col-span-2 px-3 py-2 text-xs font-semibold rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 transition-all"
+                              >
+                                Export PDF
+                              </button>
+                            </div>
+
+                            <form
+                              onSubmit={(e) => handleGrantShare(itinerary.id, e)}
+                              className="space-y-2 pt-2 border-t border-violet-100"
+                            >
+                              <p className="text-xs font-semibold text-slate-600">Grant Access</p>
+                              <input
+                                type="email"
+                                placeholder="user@example.com"
+                                value={shareEmail}
+                                onChange={(e) => setShareEmail(e.target.value)}
+                                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-slate-50 focus:bg-white focus:border-violet-400 focus:outline-none"
+                                required
+                              />
+                              <div className="flex gap-2">
+                                <select
+                                  value={shareAccess}
+                                  onChange={(e) => setShareAccess(e.target.value as 'view' | 'edit')}
+                                  className="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-sm bg-slate-50 focus:outline-none"
+                                >
+                                  <option value="view">View only</option>
+                                  <option value="edit">Can edit</option>
+                                </select>
+                                <button
+                                  type="submit"
+                                  disabled={actionLoading}
+                                  className="px-3 py-2 text-xs font-bold rounded-xl bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50"
+                                >
+                                  Grant
+                                </button>
+                              </div>
+                            </form>
+
+                            <div className="pt-2 border-t border-violet-100">
+                              <button
+                                onClick={() => handleTogglePublic(itinerary)}
+                                disabled={actionLoading}
+                                className={`w-full px-3 py-2 text-xs font-bold rounded-xl transition-all ${
+                                  itinerary.isPublic
+                                    ? 'bg-rose-100 text-rose-700 hover:bg-rose-200'
+                                    : 'bg-violet-100 text-violet-700 hover:bg-violet-200'
+                                }`}
+                              >
+                                {itinerary.isPublic ? '🔒 Make Private' : '🌐 Make Public'}
+                              </button>
+                              {itinerary.isPublic && (
+                                <p className="mt-2 text-[11px] text-slate-500 leading-relaxed break-all">
+                                  <span className="font-medium text-slate-600">Public URL: </span>
+                                  <span className="text-violet-600">
+                                    {`${window.location.origin}/itinerary/${itinerary.id}`}
+                                  </span>
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </section>
 
-            {/* Shared itineraries */}
+            {/* Shared with me */}
             {sharedItineraries.length > 0 && (
               <section>
-                <h2 className="text-base font-bold text-slate-500 uppercase tracking-wider mb-5">
+                <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-5">
                   Shared with Me
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {sharedItineraries.map((itinerary) => (
-                    <Link
-                      key={itinerary.id}
-                      to={`/itinerary/${itinerary.id}`}
-                      className="block bg-white rounded-2xl border border-slate-100 shadow-card hover:shadow-card-hover hover:-translate-y-0.5 transition-all duration-200 overflow-hidden group"
-                    >
-                      <div className="h-1 bg-gradient-to-r from-cyan-500 to-violet-500 rounded-t-2xl" />
-                      <div className="p-5">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 text-xs font-semibold mb-3">
-                          👥 Shared
-                        </span>
-                        <h3 className="text-lg font-bold text-slate-900 mb-1.5 leading-snug group-hover:text-violet-700 transition-colors">
-                          {itinerary.title}
-                        </h3>
-                        {itinerary.description && (
-                          <p className="text-slate-500 text-sm mb-3 line-clamp-2">
-                            {itinerary.description}
-                          </p>
-                        )}
-                        <div className="flex flex-col gap-1 text-xs text-slate-500">
-                          <span>📅 {format(parseISO(itinerary.startDate), 'MMM dd, yyyy')}</span>
-                          <span>🏁 {format(parseISO(itinerary.endDate), 'MMM dd, yyyy')}</span>
+                  {sharedItineraries.map((itinerary) => {
+                    const days = getTripDays(itinerary.startDate, itinerary.endDate);
+                    return (
+                      <Link
+                        key={itinerary.id}
+                        to={`/itinerary/${itinerary.id}`}
+                        className="block bg-white rounded-2xl border border-slate-100 shadow-card hover:shadow-card-hover hover:-translate-y-0.5 transition-all duration-200 overflow-hidden group"
+                      >
+                        <div className="h-1 bg-gradient-to-r from-cyan-500 to-violet-500 rounded-t-2xl" />
+                        <div className="p-5">
+                          <div className="flex items-center gap-2 mb-3">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 text-xs font-semibold">
+                              👥 Shared
+                            </span>
+                            <span className="ml-auto text-xs font-semibold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-100">
+                              {days} day{days !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                          <h3 className="text-base font-bold text-slate-900 mb-1.5 leading-snug group-hover:text-violet-700 transition-colors">
+                            {itinerary.title}
+                          </h3>
+                          {itinerary.description && (
+                            <p className="text-slate-500 text-sm mb-3 line-clamp-2">
+                              {itinerary.description}
+                            </p>
+                          )}
+                          <div className="text-xs text-slate-500">
+                            <span className="flex items-center gap-1.5">
+                              <span className="text-cyan-400">📅</span>
+                              {format(parseISO(itinerary.startDate), 'MMM dd, yyyy')}
+                              <span className="text-slate-300 mx-0.5">→</span>
+                              {format(parseISO(itinerary.endDate), 'MMM dd, yyyy')}
+                            </span>
+                          </div>
+                          {itinerary.ownerEmail && (
+                            <p className="text-[11px] text-slate-400 mt-3 pt-3 border-t border-slate-100">
+                              by {itinerary.ownerEmail}
+                            </p>
+                          )}
                         </div>
-                      </div>
-                    </Link>
-                  ))}
+                      </Link>
+                    );
+                  })}
                 </div>
               </section>
             )}

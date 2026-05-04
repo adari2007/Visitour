@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { login } from '@/store/authSlice';
 
 export function LoginPage() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const { loading, error } = useAppSelector((state) => state.auth);
   const [formData, setFormData] = useState({ email: '', password: '' });
+
+  const sessionExpired = new URLSearchParams(location.search).get('expired') === '1';
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -74,6 +77,13 @@ export function LoginPage() {
               <h1 className="text-2xl sm:text-3xl font-black text-slate-900 mb-1.5">Sign in</h1>
               <p className="text-slate-500 text-sm">Enter your credentials to continue</p>
             </div>
+
+            {sessionExpired && (
+              <div className="mb-5 flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl text-sm">
+                <span className="shrink-0">🔒</span>
+                <span>Your session has expired. Please sign in again to continue.</span>
+              </div>
+            )}
 
             {error && (
               <div className="mb-5 flex items-start gap-3 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm">

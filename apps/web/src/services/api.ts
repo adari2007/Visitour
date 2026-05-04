@@ -23,6 +23,23 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
+// Auto-logout on 401 (expired or invalid token)
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      const currentPath = window.location.pathname;
+      // Don't redirect if already on auth pages
+      if (currentPath !== '/login' && currentPath !== '/register' && currentPath !== '/') {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.replace('/login?expired=1');
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 // Auth API
 export const authAPI = {
   register: (email: string, password: string, firstName?: string, lastName?: string) =>

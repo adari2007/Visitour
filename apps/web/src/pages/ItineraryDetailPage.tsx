@@ -15,6 +15,7 @@ import {
   deleteShare,
 } from '@/store/itinerarySlice';
 import EntriesList from '@/components/EntriesList';
+import { useToast } from '@/components/Toast';
 import { differenceInCalendarDays, eachDayOfInterval, format, parseISO } from 'date-fns';
 
 interface TripEntry {
@@ -31,6 +32,7 @@ export function ItineraryDetailPage() {
   const isPublicView = searchParams.get('public') === 'true';
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const { token, user } = useAppSelector((state) => state.auth);
   const { selected: itinerary, entries, shares, loading } = useAppSelector((state) => state.itineraries);
   const [showTripEditForm, setShowTripEditForm] = useState(false);
@@ -231,32 +233,32 @@ export function ItineraryDetailPage() {
   const handleCopyFormattedText = async () => {
     try {
       await navigator.clipboard.writeText(buildFormattedText());
-      window.alert('Formatted itinerary copied to clipboard.');
+      toast('Itinerary copied to clipboard!', 'success');
     } catch (err) {
       console.error('Failed to copy text:', err);
-      window.alert('Copy failed. Please try again.');
+      toast('Copy failed. Please try again.', 'error');
     }
   };
 
   const handleCopyPublicUrl = async () => {
     if (!itinerary?.isPublic) {
-      window.alert('This itinerary is private. Make it public to share a public URL.');
+      toast('Make this trip public first to copy its public URL.', 'warning');
       return;
     }
 
     const itineraryId = id || itinerary.id;
     if (!itineraryId) {
-      window.alert('Unable to generate public URL.');
+      toast('Unable to generate public URL.', 'error');
       return;
     }
 
     try {
       const publicUrl = `${window.location.origin}/itinerary/${itineraryId}?public=true`;
       await navigator.clipboard.writeText(publicUrl);
-      window.alert('Public itinerary URL copied to clipboard.');
+      toast('Public URL copied!', 'success');
     } catch (err) {
       console.error('Failed to copy public itinerary URL:', err);
-      window.alert('Copy failed. Please try again.');
+      toast('Copy failed. Please try again.', 'error');
     }
   };
 
@@ -264,7 +266,7 @@ export function ItineraryDetailPage() {
     const content = buildFormattedText().replace(/\n/g, '<br/>');
     const printWindow = window.open('', '_blank', 'width=900,height=700');
     if (!printWindow) {
-      window.alert('Unable to open print window. Please allow popups.');
+      toast('Allow popups to export PDF.', 'warning');
       return;
     }
     printWindow.document.write(`
@@ -291,11 +293,11 @@ export function ItineraryDetailPage() {
   const handleGrantShare = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canManageShares) {
-      window.alert('Only the itinerary owner can grant access.');
+      toast('Only the owner can grant access.', 'warning');
       return;
     }
     if (!id || !shareEmail.trim()) {
-      window.alert('Please enter an email address.');
+      toast('Please enter an email address.', 'warning');
       return;
     }
     try {
@@ -303,37 +305,40 @@ export function ItineraryDetailPage() {
         createShare({ itineraryId: id, email: shareEmail.trim(), access: shareAccess })
       ).unwrap();
       setShareEmail('');
+      toast('Access granted!', 'success');
     } catch (err) {
       console.error('Failed to create share:', err);
-      window.alert('Failed to grant access.');
+      toast('Failed to grant access.', 'error');
     }
   };
 
   const handleShareAccessChange = async (shareId: string, access: 'view' | 'edit') => {
     if (!canManageShares) {
-      window.alert('Only the itinerary owner can manage access.');
+      toast('Only the owner can manage access.', 'warning');
       return;
     }
     if (!id) return;
     try {
       await dispatch(updateShare({ itineraryId: id, shareId, access })).unwrap();
+      toast('Access updated.', 'success');
     } catch (err) {
       console.error('Failed to update share access:', err);
-      window.alert('Failed to update access.');
+      toast('Failed to update access.', 'error');
     }
   };
 
   const handleRemoveShare = async (shareId: string) => {
     if (!canManageShares) {
-      window.alert('Only the itinerary owner can manage access.');
+      toast('Only the owner can manage access.', 'warning');
       return;
     }
     if (!id) return;
     try {
       await dispatch(deleteShare({ itineraryId: id, shareId })).unwrap();
+      toast('Access removed.', 'success');
     } catch (err) {
       console.error('Failed to remove share:', err);
-      window.alert('Failed to remove access.');
+      toast('Failed to remove access.', 'error');
     }
   };
 
@@ -349,7 +354,7 @@ export function ItineraryDetailPage() {
 
   const handleCreateEntries = async (newEntries: any[]) => {
     if (!canManageEntries) {
-      window.alert('This public itinerary is read-only for non-owners.');
+      toast('This itinerary is read-only.', 'warning');
       return;
     }
     if (!id || newEntries.length === 0) return;
@@ -368,7 +373,7 @@ export function ItineraryDetailPage() {
       );
     } catch (err) {
       console.error('Failed to create entries:', err);
-      window.alert('Failed to create one or more entries. Please try again.');
+      toast('Failed to create one or more entries. Please try again.', 'error');
     } finally {
       setIsCreatingEntries(false);
     }
@@ -376,7 +381,7 @@ export function ItineraryDetailPage() {
 
   const handleUpdateEntry = async (entryId: string, updates: any) => {
     if (!canManageEntries) {
-      window.alert('This public itinerary is read-only for non-owners.');
+      toast('This itinerary is read-only.', 'warning');
       return;
     }
     try {
@@ -386,26 +391,26 @@ export function ItineraryDetailPage() {
       })).unwrap();
     } catch (err) {
       console.error('Failed to update entry:', err);
-      window.alert('Failed to update entry. Please try again.');
+      toast('Failed to update entry. Please try again.', 'error');
     }
   };
 
   const handleDeleteEntryById = async (entryId: string) => {
     if (!canManageEntries) {
-      window.alert('This public itinerary is read-only for non-owners.');
+      toast('This itinerary is read-only.', 'warning');
       return;
     }
     try {
       await dispatch(deleteEntry(entryId)).unwrap();
     } catch (err) {
       console.error('Failed to delete entry by id:', err);
-      window.alert('Failed to delete one or more related transport entries. Please try again.');
+      toast('Failed to delete related entries. Please try again.', 'error');
     }
   };
 
     const handleDeleteEntry = async (entry: TripEntry) => {
       if (!canManageEntries) {
-        window.alert('This public itinerary is read-only for non-owners.');
+        toast('This itinerary is read-only.', 'warning');
         return;
       }
       console.log('handleDeleteEntry called with:', entry);
@@ -447,10 +452,9 @@ export function ItineraryDetailPage() {
               dispatch(deleteEntry(hotelEntry.id)).unwrap()
             )
           );
-          console.log('Hotel entries deleted successfully');
         } catch (err) {
           console.error('Failed to delete hotel stay entries:', err);
-          window.alert('Failed to delete one or more hotel entries. Please try again.');
+          toast('Failed to delete one or more hotel entries. Please try again.', 'error');
         }
         return;
       }
