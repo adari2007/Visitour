@@ -2369,3 +2369,7 @@ node-v18.17.0-darwin-x64/share/doc/node/gdbinit
 node-v18.17.0-darwin-x64/share/doc/node/lldb_commands.py
 node-v18.17.0-darwin-x64/share/man/man1/node.1
 node-v18.17.0-darwin-x64/share/systemtap/tapset/node.stp
+
+# Local mobile store credentials
+apps/mobile/google-service-account.json
+
